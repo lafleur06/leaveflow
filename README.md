@@ -2,13 +2,15 @@
 
 ![CI](https://github.com/lafleur06/leaveflow/actions/workflows/ci.yml/badge.svg)
 
+**Live demo: <https://leaveflow-demo-qwj5.onrender.com>.** Pick Ayşe (employee), Mehmet (manager) or Zeynep (HR) on the login page. The demo runs on a free plan and sleeps when idle, so the first visit can take about a minute. The API docs are at [/swagger-ui.html](https://leaveflow-demo-qwj5.onrender.com/swagger-ui.html).
+
 An HR leave management REST API built with Java 21 and Spring Boot, with a React client for employees, managers and HR. Employees request leave, managers approve or reject it for their own team, and HR manages staff and entitlements. Annual leave entitlement follows the Turkish Labour Law (Law No. 4857, Art. 53).
 
 > **Status:** Phases 0–6 done, plus a React frontend with HR screens. 141 tests, 97% line coverage. See the [roadmap](#roadmap).
 
 ## Try it in one command
 
-With Docker running:
+To run it on your own machine instead of the [live demo](https://leaveflow-demo-qwj5.onrender.com), with Docker running:
 
 ```bash
 docker compose -f compose.demo.yaml up --build
