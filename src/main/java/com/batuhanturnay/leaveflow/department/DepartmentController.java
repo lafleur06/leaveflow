@@ -12,6 +12,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -50,7 +51,8 @@ public class DepartmentController {
 		return departmentService.findById(id);
 	}
 
-	@Operation(summary = "Create a department")
+	@Operation(summary = "Create a department (HR)")
+	@PreAuthorize("hasRole('HR')")
 	@PostMapping
 	public ResponseEntity<DepartmentResponse> create(@Valid @RequestBody DepartmentRequest request) {
 		DepartmentResponse created = departmentService.create(request);
@@ -61,13 +63,15 @@ public class DepartmentController {
 		return ResponseEntity.created(location).body(created);
 	}
 
-	@Operation(summary = "Replace a department")
+	@Operation(summary = "Replace a department (HR)")
+	@PreAuthorize("hasRole('HR')")
 	@PutMapping("/{id}")
 	public DepartmentResponse update(@PathVariable Long id, @Valid @RequestBody DepartmentRequest request) {
 		return departmentService.update(id, request);
 	}
 
-	@Operation(summary = "Delete a department (only when it has no employees)")
+	@Operation(summary = "Delete a department (only when it has no employees) (HR)")
+	@PreAuthorize("hasRole('HR')")
 	@DeleteMapping("/{id}")
 	@ResponseStatus(HttpStatus.NO_CONTENT)
 	public void delete(@PathVariable Long id) {

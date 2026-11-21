@@ -6,9 +6,11 @@ import java.time.LocalDate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.batuhanturnay.leaveflow.common.error.ForbiddenException;
 import com.batuhanturnay.leaveflow.employee.Employee;
 import com.batuhanturnay.leaveflow.employee.EmployeeService;
 import com.batuhanturnay.leaveflow.leave.dto.LeaveBalanceResponse;
+import com.batuhanturnay.leaveflow.security.CurrentUser;
 
 /**
  * The balance is calculated, not stored: earned days come from the hire and birth dates,
@@ -23,17 +25,25 @@ public class LeaveBalanceService {
 
 	private final EmployeeService employeeService;
 
+	private final CurrentUser currentUser;
+
 	private final Clock clock;
 
 	public LeaveBalanceService(LeaveRequestRepository leaveRequestRepository, EmployeeService employeeService,
-			Clock clock) {
+			CurrentUser currentUser, Clock clock) {
 		this.leaveRequestRepository = leaveRequestRepository;
 		this.employeeService = employeeService;
+		this.currentUser = currentUser;
 		this.clock = clock;
 	}
 
+	/** Visible to the employee, their direct manager and HR. */
 	public LeaveBalanceResponse getBalance(Long employeeId) {
-		return calculate(employeeService.getEntity(employeeId));
+		Employee employee = employeeService.getEntity(employeeId);
+		if (!LeaveAccess.canView(currentUser.get(), employee)) {
+			throw new ForbiddenException("You may not view the leave balance of employee %d".formatted(employeeId));
+		}
+		return calculate(employee);
 	}
 
 	LeaveBalanceResponse calculate(Employee employee) {

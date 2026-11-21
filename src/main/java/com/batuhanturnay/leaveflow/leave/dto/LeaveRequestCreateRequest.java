@@ -7,10 +7,8 @@ import jakarta.validation.constraints.Size;
 
 import com.batuhanturnay.leaveflow.leave.LeaveType;
 
-/** Body for submitting a leave request. Both dates are inclusive. */
+/** Body for submitting a leave request for yourself. Both dates are inclusive. */
 public record LeaveRequestCreateRequest(
-
-		@NotNull Long employeeId,
 
 		@NotNull LeaveType type,
 

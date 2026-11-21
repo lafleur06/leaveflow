@@ -7,6 +7,7 @@ import java.time.temporal.ChronoUnit;
 
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -22,6 +23,8 @@ import com.batuhanturnay.leaveflow.leave.dto.LeaveBalanceResponse;
 import com.batuhanturnay.leaveflow.leave.dto.LeaveDecisionRequest;
 import com.batuhanturnay.leaveflow.leave.dto.LeaveRequestCreateRequest;
 import com.batuhanturnay.leaveflow.leave.dto.LeaveRequestResponse;
+import com.batuhanturnay.leaveflow.security.AuthenticatedUser;
+import com.batuhanturnay.leaveflow.security.CurrentUser;
 
 @Service
 @Transactional(readOnly = true)
@@ -37,36 +40,49 @@ public class LeaveRequestService {
 
 	private final LeaveBalanceService balanceService;
 
+	private final CurrentUser currentUser;
+
 	private final Clock clock;
 
 	public LeaveRequestService(LeaveRequestRepository leaveRequestRepository, EmployeeRepository employeeRepository,
 			EmployeeService employeeService, HolidayService holidayService, LeaveBalanceService balanceService,
-			Clock clock) {
+			CurrentUser currentUser, Clock clock) {
 		this.leaveRequestRepository = leaveRequestRepository;
 		this.employeeRepository = employeeRepository;
 		this.employeeService = employeeService;
 		this.holidayService = holidayService;
 		this.balanceService = balanceService;
+		this.currentUser = currentUser;
 		this.clock = clock;
 	}
 
+	/** HR sees everything; everyone else only their own requests and those of their direct reports. */
 	public Page<LeaveRequestResponse> search(Long employeeId, Long managerId, LeaveStatus status, LeaveType type,
 			Pageable pageable) {
-		return leaveRequestRepository
-			.findAll(LeaveRequestSpecifications.filter(employeeId, managerId, status, type), pageable)
-			.map(LeaveRequestResponse::from);
+		AuthenticatedUser user = currentUser.get();
+		Specification<LeaveRequest> spec = LeaveRequestSpecifications.filter(employeeId, managerId, status, type);
+		if (!user.isHr()) {
+			spec = spec.and(LeaveRequestSpecifications.visibleTo(user.id()));
+		}
+		return leaveRequestRepository.findAll(spec, pageable).map(LeaveRequestResponse::from);
 	}
 
 	public LeaveRequestResponse findById(Long id) {
-		return LeaveRequestResponse.from(getEntity(id));
+		LeaveRequest request = getEntity(id);
+		if (!LeaveAccess.canView(currentUser.get(), request.getEmployee())) {
+			throw new ForbiddenException("You may not view leave request %d".formatted(id));
+		}
+		return LeaveRequestResponse.from(request);
 	}
 
+	/** Submits a request for the logged-in employee. */
 	@Transactional
 	public LeaveRequestResponse create(LeaveRequestCreateRequest request) {
+		long employeeId = currentUser.get().id();
 		// Lock the employee first: parallel requests for the same person are processed one after another,
 		// so the overlap and balance checks below always see each other's results.
-		Employee employee = employeeRepository.findByIdForUpdate(request.employeeId())
-			.orElseThrow(() -> new ResourceNotFoundException("Employee", request.employeeId()));
+		Employee employee = employeeRepository.findByIdForUpdate(employeeId)
+			.orElseThrow(() -> new ResourceNotFoundException("Employee", employeeId));
 		LocalDate start = request.startDate();
 		LocalDate end = request.endDate();
 		LeaveType type = request.type();
@@ -111,7 +127,7 @@ public class LeaveRequestService {
 	@Transactional
 	public LeaveRequestResponse approve(Long id, LeaveDecisionRequest decision) {
 		LeaveRequest request = getEntity(id);
-		Employee approver = checkApprover(request, decision.approverId());
+		Employee approver = checkDecider(request);
 		request.approve(approver, decision.note(), now());
 		return LeaveRequestResponse.from(leaveRequestRepository.saveAndFlush(request));
 	}
@@ -122,14 +138,19 @@ public class LeaveRequestService {
 			throw new BusinessRuleException("A note explaining the rejection is required");
 		}
 		LeaveRequest request = getEntity(id);
-		Employee approver = checkApprover(request, decision.approverId());
+		Employee approver = checkDecider(request);
 		request.reject(approver, decision.note().strip(), now());
 		return LeaveRequestResponse.from(leaveRequestRepository.saveAndFlush(request));
 	}
 
+	/** The employee withdraws their own request; HR may cancel any. */
 	@Transactional
 	public LeaveRequestResponse cancel(Long id) {
 		LeaveRequest request = getEntity(id);
+		AuthenticatedUser user = currentUser.get();
+		if (!user.isHr() && !user.is(request.getEmployee().getId())) {
+			throw new ForbiddenException("Only the employee or HR can cancel leave request %d".formatted(id));
+		}
 		request.cancel(LocalDate.now(clock));
 		return LeaveRequestResponse.from(leaveRequestRepository.saveAndFlush(request));
 	}
@@ -139,24 +160,25 @@ public class LeaveRequestService {
 	}
 
 	/**
-	 * Only the employee's direct manager may decide. Employees without a manager cannot be
-	 * approved yet: the HR role that covers them arrives with authentication in Phase 3.
+	 * The direct manager decides. HR steps in only for employees who have no manager,
+	 * so HR cannot silently overrule a manager. Nobody decides on their own leave.
 	 */
-	private Employee checkApprover(LeaveRequest request, Long approverId) {
+	private Employee checkDecider(LeaveRequest request) {
+		AuthenticatedUser user = currentUser.get();
 		Employee employee = request.getEmployee();
-		if (employee.getId().equals(approverId)) {
+		if (user.is(employee.getId())) {
 			throw new ForbiddenException("Employees cannot decide on their own leave requests");
 		}
-		Employee manager = employee.getManager();
-		if (manager == null) {
-			throw new BusinessRuleException(
-					"Employee %d has no manager to decide on this request".formatted(employee.getId()));
+		if (employee.getManager() == null) {
+			if (!user.isHr()) {
+				throw new ForbiddenException("Requests of employees without a manager are decided by HR");
+			}
 		}
-		if (!manager.getId().equals(approverId)) {
-			throw new ForbiddenException(
-					"Only the employee's direct manager (employee %d) can decide on this request".formatted(manager.getId()));
+		else if (!LeaveAccess.isDirectManager(user, employee)) {
+			throw new ForbiddenException("Only the employee's direct manager (employee %d) can decide on this request"
+				.formatted(employee.getManager().getId()));
 		}
-		return employeeService.getEntity(approverId);
+		return employeeService.getEntity(user.id());
 	}
 
 	private Instant now() {
