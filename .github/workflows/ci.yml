@@ -26,12 +26,9 @@ jobs:
               print ""
               print "| Counter | Covered |"
               print "|---|---|"
-              printf "| Lines | %.1f%% |
-", 100 * lc / (lm + lc)
-              printf "| Branches | %.1f%% |
-", 100 * bc / (bm + bc)
-              printf "| Instructions | %.1f%% |
-", 100 * ic / (im + ic)
+              printf "| Lines | %.1f%% |\n", 100 * lc / (lm + lc)
+              printf "| Branches | %.1f%% |\n", 100 * bc / (bm + bc)
+              printf "| Instructions | %.1f%% |\n", 100 * ic / (im + ic)
             }' target/site/jacoco/jacoco.csv >> "$GITHUB_STEP_SUMMARY"
       - name: Upload coverage report
         if: always() && hashFiles('target/site/jacoco/index.html') != ''
