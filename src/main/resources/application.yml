@@ -27,12 +27,25 @@ server:
   error:
     include-message: always
 
+leaveflow:
+  security:
+    # At least 32 characters. Empty = random key per start (development only).
+    jwt-secret: ${LEAVEFLOW_JWT_SECRET:}
+    token-ttl: 1h
+    admin:
+      # First HR account, created at startup only when no HR account exists.
+      email: ${LEAVEFLOW_ADMIN_EMAIL:hr@leaveflow.local}
+      # Empty = a random password is generated and printed once in the log.
+      password: ${LEAVEFLOW_ADMIN_PASSWORD:}
+
 springdoc:
   swagger-ui:
     tags-sorter: alpha
     # Opens every operation ready to send, without clicking "Try it out" first.
     try-it-out-enabled: true
     display-request-duration: true
+    # Keeps the token after a page reload, so you do not have to authorize again.
+    persist-authorization: true
 
 management:
   endpoints:

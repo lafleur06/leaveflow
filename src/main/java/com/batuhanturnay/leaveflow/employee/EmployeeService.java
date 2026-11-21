@@ -6,6 +6,7 @@ import java.util.Locale;
 
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -16,6 +17,8 @@ import com.batuhanturnay.leaveflow.department.Department;
 import com.batuhanturnay.leaveflow.department.DepartmentService;
 import com.batuhanturnay.leaveflow.employee.dto.EmployeeRequest;
 import com.batuhanturnay.leaveflow.employee.dto.EmployeeResponse;
+import com.batuhanturnay.leaveflow.security.AuthenticatedUser;
+import com.batuhanturnay.leaveflow.security.CurrentUser;
 
 @Service
 @Transactional(readOnly = true)
@@ -31,18 +34,50 @@ public class EmployeeService {
 
 	private final DepartmentService departmentService;
 
-	public EmployeeService(EmployeeRepository employeeRepository, DepartmentService departmentService) {
+	private final CurrentUser currentUser;
+
+	private final PasswordEncoder passwordEncoder;
+
+	public EmployeeService(EmployeeRepository employeeRepository, DepartmentService departmentService,
+			CurrentUser currentUser, PasswordEncoder passwordEncoder) {
 		this.employeeRepository = employeeRepository;
 		this.departmentService = departmentService;
+		this.currentUser = currentUser;
+		this.passwordEncoder = passwordEncoder;
 	}
 
+	/** Every employee may browse the directory; birth dates are visible to HR only. */
 	public Page<EmployeeResponse> search(Long departmentId, Boolean active, String query, Pageable pageable) {
+		AuthenticatedUser viewer = currentUser.get();
 		return employeeRepository.findAll(EmployeeSpecifications.filter(departmentId, active, query), pageable)
-			.map(EmployeeResponse::from);
+			.map(employee -> visibleTo(viewer, employee));
 	}
 
 	public EmployeeResponse findById(Long id) {
-		return EmployeeResponse.from(getEntity(id));
+		return visibleTo(currentUser.get(), getEntity(id));
+	}
+
+	@Transactional
+	public EmployeeResponse changeRole(Long id, Role role) {
+		Employee employee = getEntity(id);
+		if (currentUser.get().is(id)) {
+			// stops the last HR account from locking everyone out by demoting itself
+			throw new BusinessRuleException("You cannot change your own role");
+		}
+		employee.changeRole(role);
+		return EmployeeResponse.from(employeeRepository.saveAndFlush(employee));
+	}
+
+	/** HR sets an initial password or resets a forgotten one. */
+	@Transactional
+	public void setPassword(Long id, String rawPassword) {
+		getEntity(id).changePasswordHash(passwordEncoder.encode(rawPassword));
+	}
+
+	/** Personal data (the birth date, under KVKK) is shown only to HR and to the employee themselves. */
+	private static EmployeeResponse visibleTo(AuthenticatedUser viewer, Employee employee) {
+		EmployeeResponse response = EmployeeResponse.from(employee);
+		return viewer.isHr() || viewer.is(employee.getId()) ? response : response.withoutPersonalData();
 	}
 
 	@Transactional

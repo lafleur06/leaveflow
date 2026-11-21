@@ -4,6 +4,8 @@ import java.time.LocalDate;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
@@ -49,6 +51,14 @@ public class Employee extends BaseEntity {
 	@Column(nullable = false)
 	private boolean active = true;
 
+	@Enumerated(EnumType.STRING)
+	@Column(nullable = false, length = 20)
+	private Role role = Role.EMPLOYEE;
+
+	/** BCrypt hash; {@code null} until HR sets an initial password, which blocks login. */
+	@Column(name = "password_hash", length = 100)
+	private String passwordHash;
+
 	protected Employee() {
 		// for JPA
 	}
@@ -72,6 +82,27 @@ public class Employee extends BaseEntity {
 
 	public void deactivate() {
 		this.active = false;
+	}
+
+	public void changeRole(Role role) {
+		this.role = role;
+	}
+
+	/** @param passwordHash an already encoded password, never the raw value */
+	public void changePasswordHash(String passwordHash) {
+		this.passwordHash = passwordHash;
+	}
+
+	public boolean isHr() {
+		return role == Role.HR;
+	}
+
+	public Role getRole() {
+		return role;
+	}
+
+	public String getPasswordHash() {
+		return passwordHash;
 	}
 
 	public String getFullName() {

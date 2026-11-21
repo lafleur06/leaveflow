@@ -14,6 +14,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -41,9 +42,20 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 		return problem(HttpStatus.CONFLICT, "Conflict", ex.getMessage());
 	}
 
+	@ExceptionHandler(UnauthorizedException.class)
+	ProblemDetail handleUnauthorized(UnauthorizedException ex) {
+		return problem(HttpStatus.UNAUTHORIZED, "Unauthorized", ex.getMessage());
+	}
+
 	@ExceptionHandler(ForbiddenException.class)
 	ProblemDetail handleForbidden(ForbiddenException ex) {
 		return problem(HttpStatus.FORBIDDEN, "Forbidden", ex.getMessage());
+	}
+
+	/** A failed {@code @PreAuthorize} check, e.g. a regular employee calling an HR-only endpoint. */
+	@ExceptionHandler(AccessDeniedException.class)
+	ProblemDetail handleAccessDenied(AccessDeniedException ex) {
+		return problem(HttpStatus.FORBIDDEN, "Forbidden", "You do not have permission to perform this action");
 	}
 
 	/** Two users changed the same record at the same time; the second one must reload and retry. */
