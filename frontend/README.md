@@ -19,6 +19,8 @@ npm run dev
 
 Open <http://localhost:5173>. Vite proxies `/api` to `localhost:8080`, so the browser talks to a single origin and the API needs no CORS settings during development.
 
+To work on the UI against the demo data instead, start the demo (`LEAVEFLOW_PORT=9090 docker compose -f compose.demo.yaml up --build` in the repository root) and point the proxy at it: `LEAVEFLOW_API=http://localhost:9090 npm run dev`.
+
 ## Scripts
 
 | Command | What it does |
