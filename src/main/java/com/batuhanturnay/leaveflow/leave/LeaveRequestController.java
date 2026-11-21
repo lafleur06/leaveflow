@@ -1,6 +1,7 @@
 package com.batuhanturnay.leaveflow.leave;
 
 import java.net.URI;
+import java.util.List;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -23,6 +24,7 @@ import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
 import com.batuhanturnay.leaveflow.leave.dto.LeaveDecisionRequest;
 import com.batuhanturnay.leaveflow.leave.dto.LeaveRequestCreateRequest;
+import com.batuhanturnay.leaveflow.leave.dto.LeaveRequestEventResponse;
 import com.batuhanturnay.leaveflow.leave.dto.LeaveRequestResponse;
 
 @Tag(name = "Leave requests", description = "Submitting, approving, rejecting and cancelling leave")
@@ -53,6 +55,12 @@ public class LeaveRequestController {
 	@GetMapping("/{id}")
 	public LeaveRequestResponse get(@PathVariable Long id) {
 		return leaveRequestService.findById(id);
+	}
+
+	@Operation(summary = "History of a leave request: who submitted, decided or cancelled it, and when")
+	@GetMapping("/{id}/history")
+	public List<LeaveRequestEventResponse> history(@PathVariable Long id) {
+		return leaveRequestService.history(id);
 	}
 
 	@Operation(summary = "Submit a leave request for yourself (starts as PENDING)")

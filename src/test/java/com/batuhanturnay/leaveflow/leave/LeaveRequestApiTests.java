@@ -224,7 +224,9 @@ class LeaveRequestApiTests extends IntegrationTest {
 
 		mockMvc.perform(post("/api/leave-requests/{id}/cancel", id).with(as(manager)))
 			.andExpect(status().isForbidden());
-		mockMvc.perform(post("/api/leave-requests/{id}/cancel", id)).andExpect(status().isOk()); // HR
+		long hr = createHrEmployee("Selin", "selin@example.com", engineering);
+		mockMvc.perform(post("/api/leave-requests/{id}/cancel", id).with(as(hr, Role.HR)))
+			.andExpect(status().isOk());
 	}
 
 	@Test
