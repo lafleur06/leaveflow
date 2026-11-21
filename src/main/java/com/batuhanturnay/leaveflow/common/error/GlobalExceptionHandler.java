@@ -7,6 +7,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.data.core.PropertyReferenceException;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -38,6 +39,18 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 	@ExceptionHandler(ConflictException.class)
 	ProblemDetail handleConflict(ConflictException ex) {
 		return problem(HttpStatus.CONFLICT, "Conflict", ex.getMessage());
+	}
+
+	@ExceptionHandler(ForbiddenException.class)
+	ProblemDetail handleForbidden(ForbiddenException ex) {
+		return problem(HttpStatus.FORBIDDEN, "Forbidden", ex.getMessage());
+	}
+
+	/** Two users changed the same record at the same time; the second one must reload and retry. */
+	@ExceptionHandler(OptimisticLockingFailureException.class)
+	ProblemDetail handleOptimisticLock(OptimisticLockingFailureException ex) {
+		return problem(HttpStatus.CONFLICT, "Concurrent update",
+				"The record was changed by someone else in the meantime; reload it and try again");
 	}
 
 	@ExceptionHandler(BusinessRuleException.class)
