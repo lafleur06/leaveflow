@@ -2,9 +2,9 @@
 
 ![CI](https://github.com/lafleur06/leaveflow/actions/workflows/ci.yml/badge.svg)
 
-An HR leave management REST API built with Java 21 and Spring Boot. Employees request leave, managers approve or reject it for their own team, and HR manages staff and entitlements. Annual leave entitlement follows the Turkish Labour Law (Law No. 4857, Art. 53).
+An HR leave management REST API built with Java 21 and Spring Boot, with a small React client. Employees request leave, managers approve or reject it for their own team, and HR manages staff and entitlements. Annual leave entitlement follows the Turkish Labour Law (Law No. 4857, Art. 53).
 
-> **Status:** Phase 3 – JWT authentication and role-based access. See the [roadmap](#roadmap).
+> **Status:** Phase 3 done, plus a React frontend. See the [roadmap](#roadmap).
 
 ## Tech stack
 
@@ -16,7 +16,8 @@ An HR leave management REST API built with Java 21 and Spring Boot. Employees re
 | Security | Spring Security, OAuth2 Resource Server (JWT, HMAC-SHA256), BCrypt |
 | Ops | Spring Boot Actuator, Docker Compose |
 | Testing | JUnit 5, Testcontainers, Spring Security Test |
-| CI | GitHub Actions |
+| Frontend | React 19, TypeScript, Vite, React Router, TanStack Query ([details](frontend/README.md)) |
+| CI | GitHub Actions (backend build and tests, frontend lint and build) |
 
 ## Getting started
 
@@ -49,6 +50,18 @@ Then, in Swagger UI:
 1. `POST /api/auth/login` with that email and password, and copy the `accessToken`.
 2. Click **Authorize** and paste the token.
 3. As HR, create employees and give them a password with `PUT /api/employees/{id}/password`, so they can log in too.
+
+### Run the frontend
+
+With the API running, in a second terminal:
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+Open <http://localhost:5173> and log in. Employees see their balance as a strip of days, request and cancel leave; managers approve or reject their team's requests under **Team approvals**. HR administration (employees, roles, passwords, holidays) is done through Swagger UI for now.
 
 ### Configuration
 
@@ -202,6 +215,7 @@ src/main/java/com/batuhanturnay/leaveflow
 └── leave        leave requests, approval workflow, entitlement and balance
 src/main/resources/db/migration   Flyway migrations
 src/test/java/...                 unit tests for business rules, API integration tests (MockMvc + Testcontainers)
+frontend/                         React client (Vite dev server proxies /api to :8080)
 compose.yaml                      local PostgreSQL
 .github/workflows/ci.yml          build + test on every push / PR
 ```
@@ -212,7 +226,7 @@ compose.yaml                      local PostgreSQL
 - [x] **Phase 1 – Core domain:** Employee and Department, DTOs, validation, global error handling (`ProblemDetail`), pagination
 - [x] **Phase 2 – Leave workflow:** leave request state machine, entitlement calculation, overlap check, working-day calculation
 - [x] **Phase 3 – Security:** JWT authentication, roles (EMPLOYEE / HR, managers derived from reporting lines), team-scoped approvals
-- [ ] **Frontend:** a small React client for login, my leave, new request and the manager's approval queue
+- [x] **Frontend:** a small React client for login, my leave, new request and the manager's approval queue (HR screens still to come)
 - [ ] **Phase 4 – Testing:** coverage report (JaCoCo), more edge cases
 - [ ] **Phase 5 – Extras:** reporting endpoints, CSV/Excel export, audit trail of decisions
 - [ ] **Phase 6 – Showcase:** ~~OpenAPI docs~~ (done early: Swagger UI), ER diagram, live demo
