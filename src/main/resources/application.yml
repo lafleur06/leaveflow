@@ -8,10 +8,20 @@ spring:
       ddl-auto: validate
   flyway:
     locations: classpath:db/migration
+  data:
+    web:
+      pageable:
+        # Stable JSON shape for paged responses: { "content": [...], "page": { ... } }
+        serialization-mode: via-dto
+        max-page-size: 100
   docker:
     compose:
       # Starts compose.yaml on `mvnw spring-boot:run` and wires the datasource automatically.
       lifecycle-management: start-only
+
+  web:
+    # Default language of validation messages; clients may ask for another via Accept-Language.
+    locale: en
 
 server:
   error:
