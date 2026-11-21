@@ -40,9 +40,9 @@ class HolidayApiTests extends IntegrationTest {
 		long employee = createEmployee("Ayse", "ayse@example.com", department, null);
 
 		// Mon 13 - Fri 17 July: 15 July (national) and 14 July (company) are both excluded
-		mockMvc.perform(post("/api/leave-requests").contentType(MediaType.APPLICATION_JSON).content("""
-				{ "employeeId": %d, "type": "ANNUAL", "startDate": "2026-07-13", "endDate": "2026-07-17" }
-				""".formatted(employee)))
+		mockMvc.perform(post("/api/leave-requests").with(as(employee)).contentType(MediaType.APPLICATION_JSON).content("""
+				{ "type": "ANNUAL", "startDate": "2026-07-13", "endDate": "2026-07-17" }
+				"""))
 			.andExpect(status().isCreated())
 			.andExpect(jsonPath("$.workingDays").value(3));
 	}
@@ -53,6 +53,17 @@ class HolidayApiTests extends IntegrationTest {
 				{ "date": "2026-10-29", "name": "Duplicate" }
 				"""))
 			.andExpect(status().isConflict());
+	}
+
+	@Test
+	void onlyHrManagesHolidays() throws Exception {
+		long department = createDepartment("Engineering");
+		long employee = createEmployee("Ayse", "ayse@example.com", department, null);
+
+		mockMvc.perform(get("/api/holidays").with(as(employee))).andExpect(status().isOk());
+		mockMvc.perform(post("/api/holidays").with(as(employee)).contentType(MediaType.APPLICATION_JSON).content("""
+				{ "date": "2026-12-31", "name": "New Year's Eve" }
+				""")).andExpect(status().isForbidden());
 	}
 
 	@Test
