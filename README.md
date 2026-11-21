@@ -8,6 +8,22 @@ An HR leave management REST API built with Java 21 and Spring Boot, with a React
 
 > **Status:** Phases 0–6 done, plus a React frontend with HR screens. 141 tests, 97% line coverage. See the [roadmap](#roadmap).
 
+![My leave: the annual balance as day tiles, a request form, and each request with its decision and history](docs/screenshots/my-leave.png)
+
+## Screenshots
+
+| A manager's approval queue | HR: who is away, and reports as Excel or CSV |
+|---|---|
+| ![Approvals: pending requests of the manager's team with Approve and Reject](docs/screenshots/approvals.png) | ![Reports: a four-week calendar of approved leave per person, and three report downloads](docs/screenshots/reports.png) |
+| **HR: people, reporting lines and accounts** | **Login, with one-click demo accounts** |
+| ![People: employees with department, manager and flags such as HR or no password yet, and the departments panel](docs/screenshots/people.png) | ![Login page with the tile wall and the three demo accounts](docs/screenshots/login.png) |
+
+<p align="center">
+  <img src="docs/screenshots/phone-my-leave.png" alt="My leave on a phone: the balance panel with day tiles in groups of five" width="280">
+</p>
+
+The screenshots come from the demo data (`compose.demo.yaml`), so they match what the live demo shows.
+
 ## Try it in one command
 
 To run it on your own machine instead of the [live demo](https://leaveflow-demo-qwj5.onrender.com), with Docker running:
