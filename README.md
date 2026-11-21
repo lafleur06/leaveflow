@@ -4,7 +4,7 @@
 
 An HR leave management REST API built with Java 21 and Spring Boot, with a small React client. Employees request leave, managers approve or reject it for their own team, and HR manages staff and entitlements. Annual leave entitlement follows the Turkish Labour Law (Law No. 4857, Art. 53).
 
-> **Status:** Phase 3 done, plus a React frontend. See the [roadmap](#roadmap).
+> **Status:** Phases 0–4 done, plus a React frontend. 112 tests, 98% line coverage. See the [roadmap](#roadmap).
 
 ## Tech stack
 
@@ -15,9 +15,9 @@ An HR leave management REST API built with Java 21 and Spring Boot, with a small
 | API | Spring Web MVC, Bean Validation, springdoc-openapi (Swagger UI) |
 | Security | Spring Security, OAuth2 Resource Server (JWT, HMAC-SHA256), BCrypt |
 | Ops | Spring Boot Actuator, Docker Compose |
-| Testing | JUnit 5, Testcontainers, Spring Security Test |
+| Testing | JUnit 5, Testcontainers, Spring Security Test, JaCoCo (coverage gate) |
 | Frontend | React 19, TypeScript, Vite, React Router, TanStack Query ([details](frontend/README.md)) |
-| CI | GitHub Actions (backend build and tests, frontend lint and build) |
+| CI | GitHub Actions (backend build, tests and coverage; frontend lint and build) |
 
 ## Getting started
 
@@ -80,6 +80,14 @@ Secrets are never stored in the repository.
 ```
 
 Integration tests start a throwaway PostgreSQL container through Testcontainers. On machines without Docker they are skipped, not failed. CI always runs them.
+
+`verify` also measures coverage with JaCoCo and writes the report to `target/site/jacoco/index.html`. The build fails if line coverage drops below 90% or branch coverage below 85% (currently about 98% and 94%). Without Docker the integration tests are skipped, so coverage falls under the limit; add `-Djacoco.skip=true` in that case. In CI the coverage table appears in the job summary and the HTML report is attached to the run as `coverage-report`.
+
+What the tests cover:
+
+- **Business rules as unit tests:** Art. 53 entitlement boundaries (service years, age 18 and 50), working days around weekends and public holidays.
+- **Every endpoint through MockMvc against real PostgreSQL:** validation and error bodies, duplicates, 404s, role and team checks, the leave state machine (approve, reject, cancel at each status), balance edge cases such as booking exactly the remaining days.
+- **Authentication end to end:** real login tokens, wrong passwords, expired or forged tokens, the bootstrap HR account and JWT key setup.
 
 ## API
 
@@ -217,7 +225,7 @@ src/main/resources/db/migration   Flyway migrations
 src/test/java/...                 unit tests for business rules, API integration tests (MockMvc + Testcontainers)
 frontend/                         React client (Vite dev server proxies /api to :8080)
 compose.yaml                      local PostgreSQL
-.github/workflows/ci.yml          build + test on every push / PR
+.github/workflows/ci.yml          build, test and coverage on every push / PR
 ```
 
 ## Roadmap
@@ -227,6 +235,6 @@ compose.yaml                      local PostgreSQL
 - [x] **Phase 2 – Leave workflow:** leave request state machine, entitlement calculation, overlap check, working-day calculation
 - [x] **Phase 3 – Security:** JWT authentication, roles (EMPLOYEE / HR, managers derived from reporting lines), team-scoped approvals
 - [x] **Frontend:** a small React client for login, my leave, new request and the manager's approval queue (HR screens still to come)
-- [ ] **Phase 4 – Testing:** coverage report (JaCoCo), more edge cases
+- [x] **Phase 4 – Testing:** JaCoCo coverage report with a build gate, edge-case tests for the leave state machine, employee updates and the security bootstrap
 - [ ] **Phase 5 – Extras:** reporting endpoints, CSV/Excel export, audit trail of decisions
 - [ ] **Phase 6 – Showcase:** ~~OpenAPI docs~~ (done early: Swagger UI), ER diagram, live demo

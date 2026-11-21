@@ -107,4 +107,34 @@ class DepartmentApiTests extends IntegrationTest {
 			.andExpect(jsonPath("$.detail").value(containsString("still has employees")));
 	}
 
+	@Test
+	void findsDepartmentById() throws Exception {
+		long id = createDepartment("Finance");
+
+		mockMvc.perform(get("/api/departments/{id}", id))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.id").value(id))
+			.andExpect(jsonPath("$.name").value("Finance"));
+	}
+
+	@Test
+	void renamingToAnExistingNameIsRejectedButKeepingTheOwnNameIsNot() throws Exception {
+		createDepartment("Finance");
+		long id = createDepartment("Sales");
+
+		mockMvc.perform(put("/api/departments/{id}", id).contentType(MediaType.APPLICATION_JSON).content("""
+				{ "name": "FINANCE" }
+				""")).andExpect(status().isConflict());
+		mockMvc.perform(put("/api/departments/{id}", id).contentType(MediaType.APPLICATION_JSON).content("""
+				{ "name": "Sales", "description": "Same name, new description" }
+				""")).andExpect(status().isOk());
+	}
+
+	@Test
+	void onlyHrManagesDepartments() throws Exception {
+		mockMvc.perform(post("/api/departments").with(as(1)).contentType(MediaType.APPLICATION_JSON).content("""
+				{ "name": "Shadow IT" }
+				""")).andExpect(status().isForbidden());
+		mockMvc.perform(get("/api/departments").with(as(1))).andExpect(status().isOk());
+	}
 }
