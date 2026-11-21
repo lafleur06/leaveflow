@@ -1,0 +1,27 @@
+spring:
+  application:
+    name: leaveflow
+  jpa:
+    open-in-view: false
+    hibernate:
+      # Schema is owned by Flyway; Hibernate only checks that entities match it.
+      ddl-auto: validate
+  flyway:
+    locations: classpath:db/migration
+  docker:
+    compose:
+      # Starts compose.yaml on `mvnw spring-boot:run` and wires the datasource automatically.
+      lifecycle-management: start-only
+
+server:
+  error:
+    include-message: always
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: when-authorized
