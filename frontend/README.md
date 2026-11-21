@@ -1,6 +1,10 @@
 # LeaveFlow frontend
 
-A small React client for the LeaveFlow API: log in, see your annual leave balance, request leave, cancel it, and approve or reject your team's requests.
+The React client for the LeaveFlow API.
+
+- **Everyone** logs in, sees their annual leave balance, requests and cancels leave, and sees the history of each request.
+- **Managers** approve or reject their team's requests.
+- **HR** also manages people and departments, roles and passwords, and public holidays. HR sees who is away in the coming weeks, downloads reports as Excel or CSV, and decides for people who have no manager.
 
 React 19, TypeScript, Vite, React Router, TanStack Query. No UI library: one stylesheet (`src/index.css`) with design tokens.
 
@@ -27,7 +31,13 @@ Open <http://localhost:5173>. Vite proxies `/api` to `localhost:8080`, so the br
 
 - `src/api` – a typed `fetch` wrapper. It adds the bearer token, turns `problem+json` errors into `ApiError` (with per-field messages), and logs the user out on `401`.
 - `src/auth` – the token lives in `sessionStorage`, so it survives a reload but not closing the tab. The current user comes from `GET /api/me`.
-- `src/pages` – login, "My leave" (balance, request form, own requests) and "Team approvals".
+- `src/pages`:
+  - login
+  - "My leave": balance, request form, own requests with their history
+  - "Approvals": the team's requests, plus, for HR, those of people without a manager
+  - the HR pages: People, an employee's page, Public holidays, Reports
+- HR pages are only linked and routed for HR. The API enforces the same rule, so hiding them is a convenience, not the protection.
+- Reports are downloaded with `fetch`, because a plain link cannot carry the bearer token. The file name comes from the server's `Content-Disposition` header.
 - Server state is cached and refreshed with TanStack Query; after a request, approval or cancellation the affected queries are invalidated instead of being patched by hand.
 - The balance is drawn as one square per earned day (taken, waiting for approval, free); above 60 days one square stands for five.
 - The login page asks `GET /api/demo/accounts` once. Only a server running the `demo` profile answers it. Everywhere else the call returns 404 and the page shows the normal login, so the same build works for the demo and for real use.

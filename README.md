@@ -2,9 +2,9 @@
 
 ![CI](https://github.com/lafleur06/leaveflow/actions/workflows/ci.yml/badge.svg)
 
-An HR leave management REST API built with Java 21 and Spring Boot, with a small React client. Employees request leave, managers approve or reject it for their own team, and HR manages staff and entitlements. Annual leave entitlement follows the Turkish Labour Law (Law No. 4857, Art. 53).
+An HR leave management REST API built with Java 21 and Spring Boot, with a React client for employees, managers and HR. Employees request leave, managers approve or reject it for their own team, and HR manages staff and entitlements. Annual leave entitlement follows the Turkish Labour Law (Law No. 4857, Art. 53).
 
-> **Status:** Phases 0–6 done, plus a React frontend. 140 tests, 97% line coverage. See the [roadmap](#roadmap).
+> **Status:** Phases 0–6 done, plus a React frontend with HR screens. 141 tests, 97% line coverage. See the [roadmap](#roadmap).
 
 ## Try it in one command
 
@@ -124,7 +124,7 @@ Interactive documentation is available at `/swagger-ui.html` while the applicati
 | `PUT` | `/api/employees/{id}/role` | HR | Change the role (`EMPLOYEE` or `HR`), not your own |
 | `PUT` | `/api/employees/{id}/password` | HR | Set an initial password or reset a forgotten one |
 | `GET` | `/api/employees/{id}/leave-balance` | employee, manager, HR | Earned, used, pending and available days, next accrual |
-| `GET` | `/api/leave-requests` | logged in | Search: `employeeId`, `managerId`, `status`, `type`, paging. You see your own and your team's; HR sees all |
+| `GET` | `/api/leave-requests` | logged in | Search: `employeeId`, `managerId`, `status`, `type`, `withoutManager` (HR's queue), paging. You see your own and your team's; HR sees all |
 | `GET` | `/api/leave-requests/{id}` | employee, manager, HR | Get one leave request |
 | `GET` | `/api/leave-requests/{id}/history` | employee, manager, HR | Audit trail: who submitted, approved, rejected or cancelled it, when, with which note |
 | `POST` | `/api/leave-requests` | logged in | Submit leave for yourself (`ANNUAL`, `SICK` or `UNPAID`) |
@@ -282,7 +282,7 @@ compose.demo.yaml                 the whole application with demo data
 - [x] **Phase 1 – Core domain:** Employee and Department, DTOs, validation, global error handling (`ProblemDetail`), pagination
 - [x] **Phase 2 – Leave workflow:** leave request state machine, entitlement calculation, overlap check, working-day calculation
 - [x] **Phase 3 – Security:** JWT authentication, roles (EMPLOYEE / HR, managers derived from reporting lines), team-scoped approvals
-- [x] **Frontend:** a small React client for login, my leave, new request and the manager's approval queue (HR screens still to come)
+- [x] **Frontend:** a React client for employees (balance, requests, history of each request), managers (approval queue) and HR (people and departments, roles and passwords, public holidays, a "who is away" calendar and report downloads)
 - [x] **Phase 4 – Testing:** JaCoCo coverage report with a build gate, edge-case tests for the leave state machine, employee updates and the security bootstrap
 - [x] **Phase 5 – Reports and audit:** HR reports (balances, usage, absences) as JSON, CSV or Excel; audit trail of every leave status change
 - [x] **Phase 6 – Showcase:** OpenAPI docs (Swagger UI), [ER diagram](docs/data-model.md), Docker image with the client bundled, one-command demo with seeded data and one-click demo logins
