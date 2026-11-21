@@ -4,6 +4,10 @@ import java.net.URI;
 
 import jakarta.validation.Valid;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import org.springdoc.core.annotations.ParameterObject;
+
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
@@ -23,6 +27,7 @@ import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 import com.batuhanturnay.leaveflow.department.dto.DepartmentRequest;
 import com.batuhanturnay.leaveflow.department.dto.DepartmentResponse;
 
+@Tag(name = "Departments", description = "Organisational units that employees belong to")
 @RestController
 @RequestMapping("/api/departments")
 public class DepartmentController {
@@ -33,16 +38,19 @@ public class DepartmentController {
 		this.departmentService = departmentService;
 	}
 
+	@Operation(summary = "List departments")
 	@GetMapping
-	public Page<DepartmentResponse> list(@PageableDefault(size = 20, sort = "name") Pageable pageable) {
+	public Page<DepartmentResponse> list(@ParameterObject @PageableDefault(size = 20, sort = "name") Pageable pageable) {
 		return departmentService.findAll(pageable);
 	}
 
+	@Operation(summary = "Get a department")
 	@GetMapping("/{id}")
 	public DepartmentResponse get(@PathVariable Long id) {
 		return departmentService.findById(id);
 	}
 
+	@Operation(summary = "Create a department")
 	@PostMapping
 	public ResponseEntity<DepartmentResponse> create(@Valid @RequestBody DepartmentRequest request) {
 		DepartmentResponse created = departmentService.create(request);
@@ -53,11 +61,13 @@ public class DepartmentController {
 		return ResponseEntity.created(location).body(created);
 	}
 
+	@Operation(summary = "Replace a department")
 	@PutMapping("/{id}")
 	public DepartmentResponse update(@PathVariable Long id, @Valid @RequestBody DepartmentRequest request) {
 		return departmentService.update(id, request);
 	}
 
+	@Operation(summary = "Delete a department (only when it has no employees)")
 	@DeleteMapping("/{id}")
 	@ResponseStatus(HttpStatus.NO_CONTENT)
 	public void delete(@PathVariable Long id) {

@@ -4,6 +4,10 @@ import java.net.URI;
 
 import jakarta.validation.Valid;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import org.springdoc.core.annotations.ParameterObject;
+
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
@@ -24,6 +28,7 @@ import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 import com.batuhanturnay.leaveflow.employee.dto.EmployeeRequest;
 import com.batuhanturnay.leaveflow.employee.dto.EmployeeResponse;
 
+@Tag(name = "Employees", description = "Staff records, reporting lines and deactivation")
 @RestController
 @RequestMapping("/api/employees")
 public class EmployeeController {
@@ -37,18 +42,21 @@ public class EmployeeController {
 	/**
 	 * Example: {@code GET /api/employees?departmentId=1&active=true&q=ayse&sort=hireDate,desc}
 	 */
+	@Operation(summary = "Search employees by department, active flag and name or email")
 	@GetMapping
 	public Page<EmployeeResponse> list(@RequestParam(required = false) Long departmentId,
 			@RequestParam(required = false) Boolean active, @RequestParam(name = "q", required = false) String query,
-			@PageableDefault(size = 20, sort = { "lastName", "firstName" }) Pageable pageable) {
+			@ParameterObject @PageableDefault(size = 20, sort = { "lastName", "firstName" }) Pageable pageable) {
 		return employeeService.search(departmentId, active, query, pageable);
 	}
 
+	@Operation(summary = "Get an employee")
 	@GetMapping("/{id}")
 	public EmployeeResponse get(@PathVariable Long id) {
 		return employeeService.findById(id);
 	}
 
+	@Operation(summary = "Create an employee")
 	@PostMapping
 	public ResponseEntity<EmployeeResponse> create(@Valid @RequestBody EmployeeRequest request) {
 		EmployeeResponse created = employeeService.create(request);
@@ -59,12 +67,14 @@ public class EmployeeController {
 		return ResponseEntity.created(location).body(created);
 	}
 
+	@Operation(summary = "Replace an employee")
 	@PutMapping("/{id}")
 	public EmployeeResponse update(@PathVariable Long id, @Valid @RequestBody EmployeeRequest request) {
 		return employeeService.update(id, request);
 	}
 
 	/** Soft delete: the employee is deactivated, their history is kept. */
+	@Operation(summary = "Deactivate an employee (soft delete)")
 	@DeleteMapping("/{id}")
 	@ResponseStatus(HttpStatus.NO_CONTENT)
 	public void deactivate(@PathVariable Long id) {
