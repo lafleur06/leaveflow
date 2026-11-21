@@ -12,6 +12,8 @@ import org.springframework.security.oauth2.server.resource.authentication.JwtAut
 import org.springframework.security.oauth2.server.resource.authentication.JwtGrantedAuthoritiesConverter;
 import org.springframework.security.web.SecurityFilterChain;
 
+import com.batuhanturnay.leaveflow.common.web.SinglePageAppConfig;
+
 /**
  * Stateless API security: every request carries a JWT, there is no session and no cookie,
  * which is also why CSRF protection is not needed.
@@ -34,8 +36,9 @@ class SecurityConfig {
 				.requestMatchers("/swagger-ui.html", "/swagger-ui/**", "/v3/api-docs/**").permitAll()
 				.requestMatchers("/actuator/health", "/actuator/health/**", "/error").permitAll()
 				// the React client (bundled into the jar for the demo image); it holds no data, the API checks the token
-				.requestMatchers(HttpMethod.GET, "/", "/index.html", "/favicon.svg", "/assets/**", "/login",
-						"/approvals")
+				.requestMatchers(HttpMethod.GET, "/", "/index.html", "/favicon.svg", "/assets/**")
+				.permitAll()
+				.requestMatchers(HttpMethod.GET, SinglePageAppConfig.CLIENT_ROUTES)
 				.permitAll()
 				// demo accounts for the login page; the endpoint only exists with the "demo" profile
 				.requestMatchers(HttpMethod.GET, "/api/demo/accounts").permitAll()

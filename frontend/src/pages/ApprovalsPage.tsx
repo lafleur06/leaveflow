@@ -9,30 +9,61 @@ import { days, formatRange, leaveTypeLabel } from '../lib/format'
 
 export function ApprovalsPage() {
   const { user } = useAuth()
-  const waiting = useQuery({
-    queryKey: ['approvals', user!.id],
+  const isHr = user!.role === 'HR'
+
+  const team = useQuery({
+    queryKey: ['approvals', 'team', user!.id],
     queryFn: () => api.leaveRequests({ managerId: user!.id, status: 'PENDING', size: 50, sort: 'startDate,asc' }),
   })
-  const requests = waiting.data?.content ?? []
+  const unmanaged = useQuery({
+    queryKey: ['approvals', 'unmanaged'],
+    queryFn: () => api.leaveRequests({ withoutManager: true, status: 'PENDING', size: 50, sort: 'startDate,asc' }),
+    enabled: isHr,
+  })
+  const teamRequests = team.data?.content ?? []
+  // Nobody decides on their own leave, HR included; another HR colleague does.
+  const hrRequests = (unmanaged.data?.content ?? []).filter((request) => request.employee.id !== user!.id)
+  const nothingWaiting = team.isSuccess && teamRequests.length === 0 && (!isHr || unmanaged.isSuccess) && hrRequests.length === 0
 
   return (
     <div className="page">
       <header className="page-header">
-        <h1 className="page-title">Team approvals</h1>
+        <h1 className="page-title">Approvals</h1>
         <p className="page-lead">
-          Leave requested by the people who report to you, earliest first. Approved days come off their balance;
-          rejected days go back.
+          Leave waiting for your decision, earliest first. Approved days come off the balance; rejected days go back.
         </p>
       </header>
-      <ErrorMessage error={waiting.error} />
-      {waiting.isSuccess && requests.length === 0 && (
-        <p className="empty">Nothing is waiting for your decision.</p>
+      <ErrorMessage error={team.error ?? unmanaged.error} />
+      {nothingWaiting && <p className="empty">Nothing is waiting for your decision.</p>}
+
+      {teamRequests.length > 0 && (
+        <section aria-labelledby="team-queue">
+          {isHr && (
+            <h2 id="team-queue" className="section-title">
+              Your team
+            </h2>
+          )}
+          <ul className="request-list">
+            {teamRequests.map((request) => (
+              <ApprovalRow key={request.id} request={request} />
+            ))}
+          </ul>
+        </section>
       )}
-      <ul className="request-list">
-        {requests.map((request) => (
-          <ApprovalRow key={request.id} request={request} />
-        ))}
-      </ul>
+
+      {hrRequests.length > 0 && (
+        <section className="approvals-hr" aria-labelledby="hr-queue">
+          <h2 id="hr-queue" className="section-title">
+            People without a manager
+          </h2>
+          <p className="field-hint">HR decides for them, so no request goes unanswered.</p>
+          <ul className="request-list">
+            {hrRequests.map((request) => (
+              <ApprovalRow key={request.id} request={request} />
+            ))}
+          </ul>
+        </section>
+      )}
     </div>
   )
 }

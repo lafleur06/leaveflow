@@ -21,6 +21,8 @@ class SinglePageAppTests extends IntegrationTest {
 			.andExpect(content().string(containsString("LeaveFlow test client")));
 		noAuthMvc.perform(get("/approvals")).andExpect(status().isOk()).andExpect(forwardedUrl("/index.html"));
 		noAuthMvc.perform(get("/login")).andExpect(status().isOk()).andExpect(forwardedUrl("/index.html"));
+		noAuthMvc.perform(get("/people/42")).andExpect(status().isOk()).andExpect(forwardedUrl("/index.html"));
+		noAuthMvc.perform(get("/reports")).andExpect(status().isOk()).andExpect(forwardedUrl("/index.html"));
 	}
 
 	@Test

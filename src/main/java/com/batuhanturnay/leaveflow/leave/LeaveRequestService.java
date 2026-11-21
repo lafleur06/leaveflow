@@ -64,9 +64,10 @@ public class LeaveRequestService {
 
 	/** HR sees everything; everyone else only their own requests and those of their direct reports. */
 	public Page<LeaveRequestResponse> search(Long employeeId, Long managerId, LeaveStatus status, LeaveType type,
-			Pageable pageable) {
+			Boolean withoutManager, Pageable pageable) {
 		AuthenticatedUser user = currentUser.get();
-		Specification<LeaveRequest> spec = LeaveRequestSpecifications.filter(employeeId, managerId, status, type);
+		Specification<LeaveRequest> spec = LeaveRequestSpecifications.filter(employeeId, managerId, status, type,
+				withoutManager);
 		if (!user.isHr()) {
 			spec = spec.and(LeaveRequestSpecifications.visibleTo(user.id()));
 		}
