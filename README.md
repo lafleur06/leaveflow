@@ -22,6 +22,30 @@ Open <http://localhost:8080> and pick a demo account on the login page:
 
 The demo company has three departments and six employees, with leave in every state. The dates are relative to today, so the data always has a past, a present and upcoming leave. The API documentation is at <http://localhost:8080/swagger-ui.html>. `docker compose -f compose.demo.yaml down` throws the demo database away; the next `up` starts fresh.
 
+## Deploying the live demo
+
+The public demo runs on [Render](https://render.com)'s free plan, using the `Dockerfile` and the
+[`render.yaml`](render.yaml) blueprint. The database is a free [Neon](https://neon.tech) PostgreSQL project.
+Neon's free database does not expire, while Render's free one is deleted after 30 days. No secret is in the
+repository: the database credentials are entered once in Render, and Render generates the JWT key.
+
+1. **Neon:** create a project (region: Frankfurt, next to the Render service). From *Connect*, take the host,
+   database, user and password.
+2. **Render:** *New → Blueprint*, choose this repository. Render reads `render.yaml` and asks for the three
+   values marked `sync: false`:
+   - `SPRING_DATASOURCE_URL`: `jdbc:postgresql://<host>/<database>?sslmode=require`
+   - `SPRING_DATASOURCE_USERNAME` and `SPRING_DATASOURCE_PASSWORD`
+3. Deploy. Flyway creates the schema, and the `demo` profile seeds the demo company into the empty database.
+   Later pushes to `main` redeploy automatically once CI has passed.
+
+What the free plan means for visitors:
+
+- The service sleeps after 15 idle minutes, so the first visit after that takes about a minute.
+- The demo data stays; only the three login accounts are protected from changes.
+- To start over, empty the Neon database (or create a new branch in Neon) and restart the service.
+- The image runs in 512 MB. It was rehearsed locally with `--memory=512m`: it starts in about 7 seconds and
+  stays around 350 MB while generating Excel reports.
+
 ## Tech stack
 
 | Area | Technology |
@@ -273,6 +297,7 @@ docs/data-model.md                ER diagram of the schema
 Dockerfile                        production image: client + API in one container
 compose.yaml                      local PostgreSQL for development
 compose.demo.yaml                 the whole application with demo data
+render.yaml                       Render blueprint for the public demo
 .github/workflows/ci.yml          build, test and coverage on every push / PR
 ```
 
