@@ -19,8 +19,60 @@ export interface Employee {
   birthDate: string | null
   active: boolean
   role: Role
+  hasPassword: boolean
   department: Ref
   manager: Ref | null
+}
+
+/** Body of POST /api/employees and PUT /api/employees/{id}. */
+export interface EmployeeInput {
+  firstName: string
+  lastName: string
+  email: string
+  jobTitle: string | null
+  hireDate: string
+  birthDate: string
+  departmentId: number
+  managerId: number | null
+}
+
+export interface Department {
+  id: number
+  name: string
+  description: string | null
+}
+
+export interface Holiday {
+  id: number
+  date: string
+  name: string
+}
+
+export type LeaveAction = 'SUBMITTED' | 'APPROVED' | 'REJECTED' | 'CANCELLED'
+
+/** One entry of GET /api/leave-requests/{id}/history. */
+export interface LeaveEvent {
+  action: LeaveAction
+  actor: Ref | null
+  note: string | null
+  occurredAt: string
+}
+
+export interface Absence {
+  leaveRequestId: number
+  employeeId: number
+  employee: string
+  department: string
+  type: LeaveType
+  startDate: string
+  endDate: string
+  workingDays: number
+}
+
+export interface AbsenceReport {
+  from: string
+  to: string
+  rows: Absence[]
 }
 
 export interface LeaveBalance {

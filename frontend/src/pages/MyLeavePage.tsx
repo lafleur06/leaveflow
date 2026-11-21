@@ -6,6 +6,7 @@ import type { LeaveRequest, LeaveType } from '../api/types'
 import { useAuth } from '../auth/AuthContext'
 import { DayStrip } from '../components/DayStrip'
 import { ErrorMessage } from '../components/ErrorMessage'
+import { LeaveHistory } from '../components/LeaveHistory'
 import { StatusBadge } from '../components/StatusBadge'
 import { days, formatRange, leaveTypeLabel, todayIso } from '../lib/format'
 
@@ -141,11 +142,13 @@ function NewRequestForm() {
 
 function MyRequestRow({ request }: { request: LeaveRequest }) {
   const queryClient = useQueryClient()
+  const [showHistory, setShowHistory] = useState(false)
   const cancel = useMutation({
     mutationFn: () => api.cancel(request.id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['balance'] })
       queryClient.invalidateQueries({ queryKey: ['my-requests'] })
+      queryClient.invalidateQueries({ queryKey: ['history', request.id] })
     },
   })
 
@@ -165,6 +168,15 @@ function MyRequestRow({ request }: { request: LeaveRequest }) {
           </p>
         )}
         <ErrorMessage error={cancel.error} />
+        <button
+          type="button"
+          className="button-link history-toggle"
+          aria-expanded={showHistory}
+          onClick={() => setShowHistory(!showHistory)}
+        >
+          {showHistory ? 'Hide history' : 'History'}
+        </button>
+        {showHistory && <LeaveHistory requestId={request.id} />}
       </div>
       <div className="request-side">
         <StatusBadge status={request.status} />
