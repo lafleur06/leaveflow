@@ -66,3 +66,11 @@ export interface NewLeaveRequest {
   endDate: string
   reason?: string
 }
+
+/** Offered on the login page when the server runs the public demo. */
+export interface DemoAccount {
+  name: string
+  email: string
+  password: string
+  persona: string
+}

@@ -1,0 +1,8 @@
+# Public demo: `SPRING_PROFILES_ACTIVE=demo`. Seeds a small company into an empty database
+# and offers its accounts on the login page (see the demo package).
+
+leaveflow:
+  security:
+    admin:
+      # the demo brings its own HR account
+      email: ""

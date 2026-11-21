@@ -1,4 +1,5 @@
 import type {
+  DemoAccount,
   Employee,
   LeaveBalance,
   LeaveRequest,
@@ -68,6 +69,13 @@ export const api = {
     request<TokenResponse>('/api/auth/login', { method: 'POST', body: json({ email, password }) }),
 
   me: () => request<Employee>('/api/me'),
+
+  /** The demo accounts, or an empty list when the server is not a demo (the endpoint is missing). */
+  demoAccounts: () =>
+    request<DemoAccount[]>('/api/demo/accounts').catch((error: unknown) => {
+      if (error instanceof ApiError && error.status === 404) return []
+      throw error
+    }),
 
   balance: (employeeId: number) => request<LeaveBalance>(`/api/employees/${employeeId}/leave-balance`),
 
