@@ -4,7 +4,7 @@
 
 An HR leave management REST API built with Java 21 and Spring Boot, with a small React client. Employees request leave, managers approve or reject it for their own team, and HR manages staff and entitlements. Annual leave entitlement follows the Turkish Labour Law (Law No. 4857, Art. 53).
 
-> **Status:** Phases 0–4 done, plus a React frontend. 112 tests, 98% line coverage. See the [roadmap](#roadmap).
+> **Status:** Phases 0–5 done, plus a React frontend. 132 tests, 97% line coverage. See the [roadmap](#roadmap).
 
 ## Tech stack
 
@@ -12,6 +12,7 @@ An HR leave management REST API built with Java 21 and Spring Boot, with a small
 |---|---|
 | Language / framework | Java 21, Spring Boot 4.2, Maven (wrapper) |
 | Persistence | Spring Data JPA (Hibernate), PostgreSQL 17, Flyway migrations |
+| Reports | CSV (hand-written, RFC 4180) and Excel (Apache POI) through Spring MVC content negotiation |
 | API | Spring Web MVC, Bean Validation, springdoc-openapi (Swagger UI) |
 | Security | Spring Security, OAuth2 Resource Server (JWT, HMAC-SHA256), BCrypt |
 | Ops | Spring Boot Actuator, Docker Compose |
@@ -81,12 +82,12 @@ Secrets are never stored in the repository.
 
 Integration tests start a throwaway PostgreSQL container through Testcontainers. On machines without Docker they are skipped, not failed. CI always runs them.
 
-`verify` also measures coverage with JaCoCo and writes the report to `target/site/jacoco/index.html`. The build fails if line coverage drops below 90% or branch coverage below 85% (currently about 98% and 94%). Without Docker the integration tests are skipped, so coverage falls under the limit; add `-Djacoco.skip=true` in that case. In CI the coverage table appears in the job summary and the HTML report is attached to the run as `coverage-report`.
+`verify` also measures coverage with JaCoCo and writes the report to `target/site/jacoco/index.html`. The build fails if line coverage drops below 90% or branch coverage below 85% (currently about 97% and 95%). Without Docker the integration tests are skipped, so coverage falls under the limit; add `-Djacoco.skip=true` in that case. In CI the coverage table appears in the job summary and the HTML report is attached to the run as `coverage-report`.
 
 What the tests cover:
 
 - **Business rules as unit tests:** Art. 53 entitlement boundaries (service years, age 18 and 50), working days around weekends and public holidays.
-- **Every endpoint through MockMvc against real PostgreSQL:** validation and error bodies, duplicates, 404s, role and team checks, the leave state machine (approve, reject, cancel at each status), balance edge cases such as booking exactly the remaining days.
+- **Every endpoint through MockMvc against real PostgreSQL:** validation and error bodies, duplicates, 404s, role and team checks, the leave state machine (approve, reject, cancel at each status), balance edge cases such as booking exactly the remaining days, the audit trail (refused changes leave no trace), and every report in all three formats, with the files parsed back in the test.
 - **Authentication end to end:** real login tokens, wrong passwords, expired or forged tokens, the bootstrap HR account and JWT key setup.
 
 ## API
@@ -108,12 +109,23 @@ Interactive documentation is available at `/swagger-ui.html` while the applicati
 | `GET` | `/api/employees/{id}/leave-balance` | employee, manager, HR | Earned, used, pending and available days, next accrual |
 | `GET` | `/api/leave-requests` | logged in | Search: `employeeId`, `managerId`, `status`, `type`, paging. You see your own and your team's; HR sees all |
 | `GET` | `/api/leave-requests/{id}` | employee, manager, HR | Get one leave request |
+| `GET` | `/api/leave-requests/{id}/history` | employee, manager, HR | Audit trail: who submitted, approved, rejected or cancelled it, when, with which note |
 | `POST` | `/api/leave-requests` | logged in | Submit leave for yourself (`ANNUAL`, `SICK` or `UNPAID`) |
 | `POST` | `/api/leave-requests/{id}/approve` | direct manager | Approve (HR for employees without a manager) |
 | `POST` | `/api/leave-requests/{id}/reject` | direct manager | Reject with a note (HR for employees without a manager) |
 | `POST` | `/api/leave-requests/{id}/cancel` | employee, HR | Cancel a pending request, or an approved one before it starts |
 | `GET` | `/api/holidays?year=2026` | logged in | Public holidays of a year |
 | `POST` `DELETE` | `/api/holidays/...` | HR | Add or remove a public holiday |
+| `GET` | `/api/reports/leave-balances` | HR | Annual leave balance of every active employee today; `departmentId` |
+| `GET` | `/api/reports/leave-usage?year=2026` | HR | Approved leave per department and type (requests, employees, working days) |
+| `GET` | `/api/reports/absences?from=&to=` | HR | Who is away: approved leave overlapping the period (default: the next 30 days) |
+
+Reports are JSON by default. Ask for `Accept: text/csv` or the Excel type (`application/vnd.openxmlformats-officedocument.spreadsheetml.sheet`), or simply add `?format=csv` / `?format=xlsx`, to download a file:
+
+```bash
+curl -H "Authorization: Bearer $TOKEN" -OJ "localhost:8080/api/reports/leave-balances?format=xlsx"
+# saves leave-balances-<today>.xlsx
+```
 
 Example:
 
@@ -198,6 +210,9 @@ Validation messages are in English by default; send `Accept-Language: tr` to get
 - **Business rules as pure classes.** `AnnualLeavePolicy` and `WorkingDays` have no Spring or database dependencies and are covered by plain unit tests (including parameterised boundary cases of Art. 53).
 - **State transitions live in the entity.** `LeaveRequest.approve / reject / cancel` are the only way to change the status, so an invalid transition cannot be written anywhere else.
 - **Concurrency.** Submitting leave locks the employee row (`SELECT … FOR UPDATE`) so two parallel requests cannot spend the same balance; `@Version` optimistic locking stops two managers from deciding the same request at once.
+- **An audit trail written by domain events.** `LeaveRequest` raises a `LeaveStatusChanged` event on every change, including the submission; Spring Data publishes it on `save` (`@DomainEvents`), and a synchronous listener appends a row to `leave_request_events` in the same transaction. The history therefore cannot miss a change, and a change cannot be committed without its history row. The table is append-only (`@Immutable`). Its migration rebuilt the history of requests that already existed from their stored decision fields.
+- **One balance rule for every caller.** The HR balance report loads all approved and pending days with one `GROUP BY` query and then applies the same `LeaveBalanceService.balanceOf` as the single-employee endpoint, so the two can never disagree and the report needs two queries however many employees there are.
+- **Exports through content negotiation.** Report DTOs implement `Exportable`; two `HttpMessageConverter`s turn them into CSV or Excel, so each report is one controller method and the format is the client's choice. CSV is UTF-8 with a byte order mark (Turkish letters open correctly in Excel), and text that starts with `= + - @` is prefixed with `'` so a crafted name cannot run as a formula (CSV injection). Excel cells are typed: numbers and dates are real numbers and dates, text is never a formula.
 - **An injectable `Clock`** (Europe/Istanbul) instead of `LocalDate.now()`: integration tests pin "today" to a fixed date, so date-dependent rules are tested deterministically.
 
 **Security**
@@ -215,12 +230,13 @@ Validation messages are in English by default; send `Accept-Language: tr` to get
 
 ```
 src/main/java/com/batuhanturnay/leaveflow
-├── common       base entity, auditing, clock, OpenAPI, global error handling
+├── common       base entity, auditing, clock, OpenAPI, global error handling, CSV/Excel export
 ├── security     login, JWT issuing and verification, security rules, bootstrap HR account
 ├── calendar     public holidays and working-day calculation
 ├── department   department API
 ├── employee     employee API, roles and passwords
-└── leave        leave requests, approval workflow, entitlement and balance
+├── leave        leave requests, approval workflow, entitlement, balance and audit trail
+└── report       HR reports (balances, usage, absences)
 src/main/resources/db/migration   Flyway migrations
 src/test/java/...                 unit tests for business rules, API integration tests (MockMvc + Testcontainers)
 frontend/                         React client (Vite dev server proxies /api to :8080)
@@ -236,5 +252,5 @@ compose.yaml                      local PostgreSQL
 - [x] **Phase 3 – Security:** JWT authentication, roles (EMPLOYEE / HR, managers derived from reporting lines), team-scoped approvals
 - [x] **Frontend:** a small React client for login, my leave, new request and the manager's approval queue (HR screens still to come)
 - [x] **Phase 4 – Testing:** JaCoCo coverage report with a build gate, edge-case tests for the leave state machine, employee updates and the security bootstrap
-- [ ] **Phase 5 – Extras:** reporting endpoints, CSV/Excel export, audit trail of decisions
+- [x] **Phase 5 – Reports and audit:** HR reports (balances, usage, absences) as JSON, CSV or Excel; audit trail of every leave status change
 - [ ] **Phase 6 – Showcase:** ~~OpenAPI docs~~ (done early: Swagger UI), ER diagram, live demo
