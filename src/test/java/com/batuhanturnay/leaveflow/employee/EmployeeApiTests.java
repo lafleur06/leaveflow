@@ -186,4 +186,88 @@ class EmployeeApiTests extends IntegrationTest {
 		mockMvc.perform(get("/api/employees").param("departmentId", "abc")).andExpect(status().isBadRequest());
 	}
 
+	@Test
+	void updatesEmployee() throws Exception {
+		long sales = createDepartment("Sales");
+		long manager = createEmployee("Mehmet", "mehmet@example.com", engineering, null);
+		long id = createEmployee("Ayse", "ayse@example.com", engineering, null);
+
+		mockMvc
+			.perform(put("/api/employees/{id}", id).contentType(MediaType.APPLICATION_JSON)
+				.content(employeeJson(" Ayse ", "Yilmaz", "AYSE.Yilmaz@Example.com", sales, manager, "1990-05-10",
+						"2020-01-06")))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.firstName").value("Ayse"))
+			.andExpect(jsonPath("$.lastName").value("Yilmaz"))
+			.andExpect(jsonPath("$.email").value("ayse.yilmaz@example.com"))
+			.andExpect(jsonPath("$.department.name").value("Sales"))
+			.andExpect(jsonPath("$.manager.id").value(manager));
+	}
+
+	@Test
+	void rejectsUpdateToAnotherEmployeesEmail() throws Exception {
+		createEmployee("Mehmet", "mehmet@example.com", engineering, null);
+		long id = createEmployee("Ayse", "ayse@example.com", engineering, null);
+
+		mockMvc
+			.perform(put("/api/employees/{id}", id).contentType(MediaType.APPLICATION_JSON)
+				.content(employeeJson("Ayse", "Test", "Mehmet@example.com", engineering, null, "1990-05-10",
+						"2020-01-06")))
+			.andExpect(status().isConflict());
+	}
+
+	@Test
+	void keepingTheOwnEmailOnUpdateIsNotADuplicate() throws Exception {
+		long id = createEmployee("Ayse", "ayse@example.com", engineering, null);
+
+		mockMvc
+			.perform(put("/api/employees/{id}", id).contentType(MediaType.APPLICATION_JSON)
+				.content(employeeJson("Ayse", "Test", "ayse@example.com", engineering, null, "1990-05-10",
+						"2021-03-01")))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.hireDate").value("2021-03-01"));
+	}
+
+	@Test
+	void deactivatingTwiceIsHarmless() throws Exception {
+		long id = createEmployee("Ayse", "ayse@example.com", engineering, null);
+
+		mockMvc.perform(delete("/api/employees/{id}", id)).andExpect(status().isNoContent());
+		mockMvc.perform(delete("/api/employees/{id}", id)).andExpect(status().isNoContent());
+	}
+
+	@Test
+	void returnsNotFoundForUnknownEmployeeOrManager() throws Exception {
+		mockMvc.perform(get("/api/employees/{id}", 424242)).andExpect(status().isNotFound());
+		mockMvc
+			.perform(post("/api/employees").contentType(MediaType.APPLICATION_JSON)
+				.content(employeeJson("Ayse", "Test", "ayse@example.com", engineering, 424242L, "1990-05-10",
+						"2020-01-06")))
+			.andExpect(status().isNotFound());
+	}
+
+	@Test
+	void birthDateIsHiddenFromColleagues() throws Exception {
+		long ayse = createEmployee("Ayse", "ayse@example.com", engineering, null);
+		long colleague = createEmployee("Can", "can@example.com", engineering, null);
+
+		mockMvc.perform(get("/api/employees/{id}", ayse).with(as(ayse)))
+			.andExpect(jsonPath("$.birthDate").value("1990-05-10"));
+		mockMvc.perform(get("/api/employees/{id}", ayse).with(as(colleague)))
+			.andExpect(jsonPath("$.birthDate").doesNotExist());
+	}
+
+	@Test
+	void employeesCannotChangeStaffRecords() throws Exception {
+		long ayse = createEmployee("Ayse", "ayse@example.com", engineering, null);
+
+		mockMvc.perform(delete("/api/employees/{id}", ayse).with(as(ayse))).andExpect(status().isForbidden());
+		mockMvc
+			.perform(put("/api/employees/{id}/role", ayse).with(as(ayse))
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+						{ "role": "HR" }
+						"""))
+			.andExpect(status().isForbidden());
+	}
 }

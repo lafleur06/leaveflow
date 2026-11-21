@@ -303,4 +303,73 @@ class LeaveRequestApiTests extends IntegrationTest {
 					""".formatted(noteJson)));
 	}
 
+	@Test
+	void rejectedOrCancelledRequestsCannotBeCancelledAgain() throws Exception {
+		long rejected = submitAndGetId(ayse, "ANNUAL", "2026-07-20", "2026-07-24");
+		decide(rejected, "reject", manager, "Busy week").andExpect(status().isOk());
+		long cancelled = submitAndGetId(ayse, "ANNUAL", "2026-08-03", "2026-08-04");
+		mockMvc.perform(post("/api/leave-requests/{id}/cancel", cancelled).with(as(ayse))).andExpect(status().isOk());
+
+		mockMvc.perform(post("/api/leave-requests/{id}/cancel", rejected).with(as(ayse)))
+			.andExpect(status().isConflict())
+			.andExpect(jsonPath("$.detail").value(containsString("is REJECTED")));
+		mockMvc.perform(post("/api/leave-requests/{id}/cancel", cancelled).with(as(ayse)))
+			.andExpect(status().isConflict())
+			.andExpect(jsonPath("$.detail").value(containsString("is CANCELLED")));
+	}
+
+	@Test
+	void cancelledRequestCannotBeApproved() throws Exception {
+		long id = submitAndGetId(ayse, "ANNUAL", "2026-07-20", "2026-07-24");
+		mockMvc.perform(post("/api/leave-requests/{id}/cancel", id).with(as(ayse))).andExpect(status().isOk());
+
+		decide(id, "approve", manager, null).andExpect(status().isConflict());
+	}
+
+	@Test
+	void leaveCannotStartBeforeTheHireDate() throws Exception {
+		long newcomer = createEmployee("Deniz", "deniz@example.com", engineering, manager, "1995-01-01",
+				"2026-06-01");
+
+		submit(newcomer, "SICK", "2026-05-28", "2026-06-02").andExpect(status().isUnprocessableContent())
+			.andExpect(jsonPath("$.detail").value(containsString("hire date")));
+	}
+
+	@Test
+	void ownerAndDirectManagerCanOpenARequest() throws Exception {
+		long id = submitAndGetId(ayse, "ANNUAL", "2026-07-20", "2026-07-24");
+
+		mockMvc.perform(get("/api/leave-requests/{id}", id).with(as(ayse)))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.workingDays").value(5))
+			.andExpect(jsonPath("$.status").value("PENDING"));
+		mockMvc.perform(get("/api/leave-requests/{id}", id).with(as(manager))).andExpect(status().isOk());
+	}
+
+	@Test
+	void unknownRequestIsNotFound() throws Exception {
+		mockMvc.perform(get("/api/leave-requests/{id}", 424242)).andExpect(status().isNotFound());
+		mockMvc.perform(post("/api/leave-requests/{id}/approve", 424242)).andExpect(status().isNotFound());
+	}
+
+	@Test
+	void filtersByTypeAndStatus() throws Exception {
+		submitAndGetId(ayse, "ANNUAL", "2026-07-20", "2026-07-24");
+		long sick = submitAndGetId(ayse, "SICK", "2026-06-10", "2026-06-11");
+		decide(sick, "approve", manager, null).andExpect(status().isOk());
+
+		mockMvc.perform(get("/api/leave-requests").param("type", "SICK"))
+			.andExpect(jsonPath("$.content", hasSize(1)))
+			.andExpect(jsonPath("$.content[0].id").value(sick));
+		mockMvc.perform(get("/api/leave-requests").param("status", "PENDING").param("type", "SICK"))
+			.andExpect(jsonPath("$.content", hasSize(0)));
+	}
+
+	@Test
+	void theWholeBalanceCanBeBookedButNotOneDayMore() throws Exception {
+		// 6 Jul - 13 Aug 2026 has 29 weekdays; minus 15 July (Democracy and National Unity Day) that is 28
+		submit(ayse, "ANNUAL", "2026-07-06", "2026-08-13").andExpect(status().isCreated())
+			.andExpect(jsonPath("$.workingDays").value(28));
+		submit(ayse, "ANNUAL", "2026-08-17", "2026-08-17").andExpect(status().isUnprocessableContent());
+	}
 }

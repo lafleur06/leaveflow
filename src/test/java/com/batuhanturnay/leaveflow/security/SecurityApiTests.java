@@ -10,11 +10,20 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import java.time.Duration;
+import java.time.Instant;
+
 import com.jayway.jsonpath.JsonPath;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
+import org.springframework.security.oauth2.jose.jws.MacAlgorithm;
+import org.springframework.security.oauth2.jwt.JwsHeader;
+import org.springframework.security.oauth2.jwt.JwtClaimsSet;
+import org.springframework.security.oauth2.jwt.JwtEncoder;
+import org.springframework.security.oauth2.jwt.JwtEncoderParameters;
 import org.springframework.test.web.servlet.ResultActions;
 
 import com.batuhanturnay.leaveflow.IntegrationTest;
@@ -27,6 +36,9 @@ import com.batuhanturnay.leaveflow.employee.Role;
 class SecurityApiTests extends IntegrationTest {
 
 	private static final String PASSWORD = "correct-horse-42";
+
+	@Autowired
+	private JwtEncoder jwtEncoder;
 
 	private long engineering;
 
@@ -51,6 +63,23 @@ class SecurityApiTests extends IntegrationTest {
 	@Test
 	void rejectsAForgedToken() throws Exception {
 		noAuthMvc.perform(get("/api/me").header(HttpHeaders.AUTHORIZATION, "Bearer not.a.real-token"))
+			.andExpect(status().isUnauthorized());
+	}
+
+	@Test
+	void rejectsAnExpiredToken() throws Exception {
+		Instant twoHoursAgo = Instant.now().minus(Duration.ofHours(2));
+		JwtClaimsSet claims = JwtClaimsSet.builder()
+			.subject(String.valueOf(ayse))
+			.claim("role", Role.EMPLOYEE.name())
+			.issuedAt(twoHoursAgo)
+			.expiresAt(twoHoursAgo.plus(Duration.ofHours(1)))
+			.build();
+		String token = jwtEncoder
+			.encode(JwtEncoderParameters.from(JwsHeader.with(MacAlgorithm.HS256).build(), claims))
+			.getTokenValue();
+
+		noAuthMvc.perform(get("/api/me").header(HttpHeaders.AUTHORIZATION, "Bearer " + token))
 			.andExpect(status().isUnauthorized());
 	}
 
