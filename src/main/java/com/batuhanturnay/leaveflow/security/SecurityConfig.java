@@ -33,6 +33,12 @@ class SecurityConfig {
 				.requestMatchers(HttpMethod.POST, "/api/auth/login").permitAll()
 				.requestMatchers("/swagger-ui.html", "/swagger-ui/**", "/v3/api-docs/**").permitAll()
 				.requestMatchers("/actuator/health", "/actuator/health/**", "/error").permitAll()
+				// the React client (bundled into the jar for the demo image); it holds no data, the API checks the token
+				.requestMatchers(HttpMethod.GET, "/", "/index.html", "/favicon.svg", "/assets/**", "/login",
+						"/approvals")
+				.permitAll()
+				// demo accounts for the login page; the endpoint only exists with the "demo" profile
+				.requestMatchers(HttpMethod.GET, "/api/demo/accounts").permitAll()
 				.anyRequest().authenticated())
 			.oauth2ResourceServer(oauth2 -> oauth2
 				.jwt(jwt -> jwt.jwtAuthenticationConverter(jwtAuthenticationConverter()))

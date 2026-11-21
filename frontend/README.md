@@ -30,3 +30,8 @@ Open <http://localhost:5173>. Vite proxies `/api` to `localhost:8080`, so the br
 - `src/pages` – login, "My leave" (balance, request form, own requests) and "Team approvals".
 - Server state is cached and refreshed with TanStack Query; after a request, approval or cancellation the affected queries are invalidated instead of being patched by hand.
 - The balance is drawn as one square per earned day (taken, waiting for approval, free); above 60 days one square stands for five.
+- The login page asks `GET /api/demo/accounts` once. Only a server running the `demo` profile answers it. Everywhere else the call returns 404 and the page shows the normal login, so the same build works for the demo and for real use.
+
+## In production
+
+The root `Dockerfile` runs `npm run build` and copies `dist/` into the Spring Boot jar's static resources. The API then serves the client itself, from the same origin, exactly as the Vite proxy does during development.

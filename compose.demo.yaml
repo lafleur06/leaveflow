@@ -1,0 +1,37 @@
+# The whole application with demo data, in one command:
+#   docker compose -f compose.demo.yaml up --build
+# then open http://localhost:8080 and pick a demo account on the login page
+# (LEAVEFLOW_PORT=9090 picks another port if 8080 is taken).
+#
+# The database lives only as long as its container: `down` and `up` again start a fresh demo.
+# (compose.yaml is separate: it is the development database used by `mvnw spring-boot:run`.)
+
+name: leaveflow-demo
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: leaveflow
+      POSTGRES_USER: leaveflow
+      POSTGRES_PASSWORD: leaveflow
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U leaveflow -d leaveflow"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  app:
+    build: .
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      SPRING_PROFILES_ACTIVE: demo
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/leaveflow
+      SPRING_DATASOURCE_USERNAME: leaveflow
+      SPRING_DATASOURCE_PASSWORD: leaveflow
+      # Optional: a fixed signing key keeps logins valid across restarts. Without it a random key is used.
+      LEAVEFLOW_JWT_SECRET: ${LEAVEFLOW_JWT_SECRET:-}
+    ports:
+      - "${LEAVEFLOW_PORT:-8080}:8080"
