@@ -374,4 +374,18 @@ class LeaveRequestApiTests extends IntegrationTest {
 			.andExpect(jsonPath("$.workingDays").value(28));
 		submit(ayse, "ANNUAL", "2026-08-17", "2026-08-17").andExpect(status().isUnprocessableContent());
 	}
+
+	@Test
+	void hrQueueListsPendingRequestsOfPeopleWithoutAManager() throws Exception {
+		submitAndGetId(ayse, "ANNUAL", "2026-07-20", "2026-07-24"); // Ayse has a manager
+		long managersRequest = submitAndGetId(manager, "ANNUAL", "2026-08-03", "2026-08-04");
+
+		mockMvc.perform(get("/api/leave-requests").param("withoutManager", "true").param("status", "PENDING"))
+			.andExpect(jsonPath("$.content", hasSize(1)))
+			.andExpect(jsonPath("$.content[0].id").value(managersRequest));
+		// not a way around the team scope: a regular employee still only sees their own and their team's
+		mockMvc.perform(get("/api/leave-requests").param("withoutManager", "true").with(as(ayse)))
+			.andExpect(jsonPath("$.content", hasSize(0)));
+	}
+
 }

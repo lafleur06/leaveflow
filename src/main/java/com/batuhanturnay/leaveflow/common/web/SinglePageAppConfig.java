@@ -13,10 +13,14 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
  * {@code /} already gets {@code index.html} as Spring Boot's welcome page.
  */
 @Configuration(proxyBeanMethods = false)
-class SinglePageAppConfig implements WebMvcConfigurer {
+public class SinglePageAppConfig implements WebMvcConfigurer {
 
-	/** Client-side routes; keep in step with {@code frontend/src/App.tsx}. */
-	static final String[] CLIENT_ROUTES = { "/login", "/approvals" };
+	/**
+	 * Client-side routes; keep in step with {@code frontend/src/App.tsx}. The security
+	 * configuration makes the same paths public (they only ever return {@code index.html}).
+	 */
+	public static final String[] CLIENT_ROUTES = { "/login", "/approvals", "/people", "/people/**", "/holidays",
+			"/reports" };
 
 	@Override
 	public void addViewControllers(ViewControllerRegistry registry) {

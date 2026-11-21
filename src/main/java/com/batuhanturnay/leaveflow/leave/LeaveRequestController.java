@@ -4,6 +4,7 @@ import java.net.URI;
 import java.util.List;
 
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.springdoc.core.annotations.ParameterObject;
@@ -39,16 +40,19 @@ public class LeaveRequestController {
 	}
 
 	/**
-	 * A manager's approval queue: {@code GET /api/leave-requests?managerId=1&status=PENDING}
+	 * A manager's approval queue: {@code GET /api/leave-requests?managerId=1&status=PENDING}.
+	 * HR's queue (employees without a manager): {@code ?withoutManager=true&status=PENDING}.
 	 */
 	@Operation(summary = "Search leave requests (yours and your team's; HR sees all)")
 	@GetMapping
 	public Page<LeaveRequestResponse> list(@RequestParam(required = false) Long employeeId,
 			@RequestParam(required = false) Long managerId, @RequestParam(required = false) LeaveStatus status,
 			@RequestParam(required = false) LeaveType type,
+			@Parameter(description = "true: only employees who have no manager, whose requests HR decides") @RequestParam(
+					required = false) Boolean withoutManager,
 			@ParameterObject @PageableDefault(size = 20, sort = "startDate",
 					direction = Sort.Direction.DESC) Pageable pageable) {
-		return leaveRequestService.search(employeeId, managerId, status, type, pageable);
+		return leaveRequestService.search(employeeId, managerId, status, type, withoutManager, pageable);
 	}
 
 	@Operation(summary = "Get a leave request")

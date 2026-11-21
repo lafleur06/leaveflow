@@ -18,8 +18,10 @@ final class LeaveRequestSpecifications {
 
 	/**
 	 * @param managerId only requests of this manager's direct reports, e.g. a manager's approval queue
+	 * @param withoutManager {@code true}: only employees without a manager, i.e. HR's approval queue
 	 */
-	static Specification<LeaveRequest> filter(Long employeeId, Long managerId, LeaveStatus status, LeaveType type) {
+	static Specification<LeaveRequest> filter(Long employeeId, Long managerId, LeaveStatus status, LeaveType type,
+			Boolean withoutManager) {
 		List<Specification<LeaveRequest>> specs = new ArrayList<>();
 		if (employeeId != null) {
 			specs.add((root, cq, cb) -> cb.equal(root.get("employee").get("id"), employeeId));
@@ -29,6 +31,9 @@ final class LeaveRequestSpecifications {
 		}
 		if (status != null) {
 			specs.add((root, cq, cb) -> cb.equal(root.get("status"), status));
+		}
+		if (Boolean.TRUE.equals(withoutManager)) {
+			specs.add((root, cq, cb) -> cb.isNull(root.get("employee").get("manager")));
 		}
 		if (type != null) {
 			specs.add((root, cq, cb) -> cb.equal(root.get("type"), type));
