@@ -12,7 +12,7 @@ An HR leave management REST API built with Java 21 and Spring Boot. Employees re
 |---|---|
 | Language / framework | Java 21, Spring Boot 4.2, Maven (wrapper) |
 | Persistence | Spring Data JPA (Hibernate), PostgreSQL 17, Flyway migrations |
-| API | Spring Web MVC, Bean Validation |
+| API | Spring Web MVC, Bean Validation, springdoc-openapi (Swagger UI) |
 | Ops | Spring Boot Actuator, Docker Compose |
 | Testing | JUnit 5, Testcontainers |
 | CI | GitHub Actions |
@@ -32,7 +32,9 @@ An HR leave management REST API built with Java 21 and Spring Boot. Employees re
 
 Spring Boot's Docker Compose support starts PostgreSQL from `compose.yaml` and wires the datasource automatically. You do not need to install a database.
 
-Health check: <http://localhost:8080/actuator/health>
+- Swagger UI (try every endpoint from the browser): <http://localhost:8080/swagger-ui.html>
+- OpenAPI document: <http://localhost:8080/v3/api-docs>
+- Health check: <http://localhost:8080/actuator/health>
 
 ### Run the tests
 
@@ -43,6 +45,8 @@ Health check: <http://localhost:8080/actuator/health>
 Integration tests start a throwaway PostgreSQL container through Testcontainers. On machines without Docker they are skipped, not failed. CI always runs them.
 
 ## API
+
+Interactive documentation is available at `/swagger-ui.html` while the application is running.
 
 | Method | Path | Description |
 |---|---|---|
@@ -129,4 +133,4 @@ compose.yaml                      local PostgreSQL
 - [ ] **Phase 3 – Security:** JWT authentication, roles (EMPLOYEE / MANAGER / HR), team-scoped approvals
 - [ ] **Phase 4 – Testing:** unit tests for business rules, integration tests with Testcontainers, coverage report
 - [ ] **Phase 5 – Extras:** scheduled yearly accrual, reporting endpoints, CSV/Excel export, auditing
-- [ ] **Phase 6 – Showcase:** OpenAPI docs, ER diagram, design decisions, live demo
+- [ ] **Phase 6 – Showcase:** ~~OpenAPI docs~~ (done early: Swagger UI), ER diagram, design decisions, live demo
