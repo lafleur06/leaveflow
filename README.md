@@ -4,7 +4,23 @@
 
 An HR leave management REST API built with Java 21 and Spring Boot, with a small React client. Employees request leave, managers approve or reject it for their own team, and HR manages staff and entitlements. Annual leave entitlement follows the Turkish Labour Law (Law No. 4857, Art. 53).
 
-> **Status:** Phases 0–5 done, plus a React frontend. 132 tests, 97% line coverage. See the [roadmap](#roadmap).
+> **Status:** Phases 0–6 done, plus a React frontend. 140 tests, 97% line coverage. See the [roadmap](#roadmap).
+
+## Try it in one command
+
+With Docker running:
+
+```bash
+docker compose -f compose.demo.yaml up --build
+```
+
+Open <http://localhost:8080> and pick a demo account on the login page:
+
+- **Ayşe:** an employee.
+- **Mehmet:** her manager, with requests waiting for approval.
+- **Zeynep:** HR.
+
+The demo company has three departments and six employees, with leave in every state. The dates are relative to today, so the data always has a past, a present and upcoming leave. The API documentation is at <http://localhost:8080/swagger-ui.html>. `docker compose -f compose.demo.yaml down` throws the demo database away; the next `up` starts fresh.
 
 ## Tech stack
 
@@ -18,7 +34,8 @@ An HR leave management REST API built with Java 21 and Spring Boot, with a small
 | Ops | Spring Boot Actuator, Docker Compose |
 | Testing | JUnit 5, Testcontainers, Spring Security Test, JaCoCo (coverage gate) |
 | Frontend | React 19, TypeScript, Vite, React Router, TanStack Query ([details](frontend/README.md)) |
-| CI | GitHub Actions (backend build, tests and coverage; frontend lint and build) |
+| CI | GitHub Actions (backend build, tests and coverage; frontend lint and build; Docker image build) |
+| Packaging | Multi-stage Dockerfile (Node build, Maven package, layered JRE image, non-root) |
 
 ## Getting started
 
@@ -82,7 +99,7 @@ Secrets are never stored in the repository.
 
 Integration tests start a throwaway PostgreSQL container through Testcontainers. On machines without Docker they are skipped, not failed. CI always runs them.
 
-`verify` also measures coverage with JaCoCo and writes the report to `target/site/jacoco/index.html`. The build fails if line coverage drops below 90% or branch coverage below 85% (currently about 97% and 95%). Without Docker the integration tests are skipped, so coverage falls under the limit; add `-Djacoco.skip=true` in that case. In CI the coverage table appears in the job summary and the HTML report is attached to the run as `coverage-report`.
+`verify` also measures coverage with JaCoCo and writes the report to `target/site/jacoco/index.html`. The build fails if line coverage drops below 90% or branch coverage below 85% (currently about 97% and 92%). Without Docker the integration tests are skipped, so coverage falls under the limit; add `-Djacoco.skip=true` in that case. In CI the coverage table appears in the job summary and the HTML report is attached to the run as `coverage-report`.
 
 What the tests cover:
 
@@ -198,6 +215,10 @@ Every error is an [RFC 9457](https://www.rfc-editor.org/rfc/rfc9457) `applicatio
 
 Validation messages are in English by default; send `Accept-Language: tr` to get them in Turkish.
 
+## Data model
+
+Five tables, all created by Flyway. See the [ER diagram and notes](docs/data-model.md).
+
 ## Design decisions
 
 - **Feature-based packages** (`department`, `employee`, `leave`, ...) instead of layer-based ones, so each feature's controller, service, repository and DTOs sit together.
@@ -215,6 +236,12 @@ Validation messages are in English by default; send `Accept-Language: tr` to get
 - **Exports through content negotiation.** Report DTOs implement `Exportable`; two `HttpMessageConverter`s turn them into CSV or Excel, so each report is one controller method and the format is the client's choice. CSV is UTF-8 with a byte order mark (Turkish letters open correctly in Excel), and text that starts with `= + - @` is prefixed with `'` so a crafted name cannot run as a formula (CSV injection). Excel cells are typed: numbers and dates are real numbers and dates, text is never a formula.
 - **An injectable `Clock`** (Europe/Istanbul) instead of `LocalDate.now()`: integration tests pin "today" to a fixed date, so date-dependent rules are tested deterministically.
 
+**Deployment**
+
+- **One image, one origin.** The Dockerfile builds the React client and puts it into the jar's `static/` folder, so the API and the client are served together and the browser never makes a cross-origin call. No CORS configuration is needed, in development (Vite proxy) or in production. Client routes such as `/approvals` are forwarded to `index.html`, so reloads and shared links work.
+- **Small, safe runtime image:** JRE only, a non-root user, and Spring Boot's layered jar (dependencies change rarely and are cached in their own layer). There is a health check on `/actuator/health`, and memory is sized from the container limit.
+- **Configuration from the environment only:** datasource, `LEAVEFLOW_JWT_SECRET`, admin account and profile. No secrets live in the image or the repository.
+
 **Security**
 
 - **Stateless JWT** with Spring Security's own OAuth2 Resource Server and Nimbus support, no extra JWT library. The application issues tokens (login) and verifies them (every other endpoint) with one HMAC-SHA256 key. No session and no cookies, so CSRF protection is not needed.
@@ -224,6 +251,7 @@ Validation messages are in English by default; send `Accept-Language: tr` to get
 - **Passwords** are hashed with BCrypt through a delegating encoder (`{bcrypt}` prefix), so the algorithm can be upgraded later; the 72-byte BCrypt limit is enforced by validation.
 - **Personal data (KVKK).** Birth dates are returned only to HR and to the employee themselves.
 - **A bootstrap HR account** solves the first-login problem without committing a password: it comes from an environment variable or is generated and logged once.
+- **The demo protects itself.** With the `demo` profile, the three accounts offered on the login page cannot be edited, deactivated, or have their role or password changed, so one visitor cannot lock out the next. Everything else works, including creating employees and changing those.
 - **Known limitation:** a token stays valid until it expires (1 hour) even if the employee is deactivated or their role changes in the meantime; refresh tokens and revocation are not implemented.
 
 ## Project structure
@@ -236,11 +264,15 @@ src/main/java/com/batuhanturnay/leaveflow
 ├── department   department API
 ├── employee     employee API, roles and passwords
 ├── leave        leave requests, approval workflow, entitlement, balance and audit trail
-└── report       HR reports (balances, usage, absences)
+├── report       HR reports (balances, usage, absences)
+└── demo         demo profile: seed data, demo logins, protection of the demo accounts
 src/main/resources/db/migration   Flyway migrations
 src/test/java/...                 unit tests for business rules, API integration tests (MockMvc + Testcontainers)
 frontend/                         React client (Vite dev server proxies /api to :8080)
-compose.yaml                      local PostgreSQL
+docs/data-model.md                ER diagram of the schema
+Dockerfile                        production image: client + API in one container
+compose.yaml                      local PostgreSQL for development
+compose.demo.yaml                 the whole application with demo data
 .github/workflows/ci.yml          build, test and coverage on every push / PR
 ```
 
@@ -253,4 +285,4 @@ compose.yaml                      local PostgreSQL
 - [x] **Frontend:** a small React client for login, my leave, new request and the manager's approval queue (HR screens still to come)
 - [x] **Phase 4 – Testing:** JaCoCo coverage report with a build gate, edge-case tests for the leave state machine, employee updates and the security bootstrap
 - [x] **Phase 5 – Reports and audit:** HR reports (balances, usage, absences) as JSON, CSV or Excel; audit trail of every leave status change
-- [ ] **Phase 6 – Showcase:** ~~OpenAPI docs~~ (done early: Swagger UI), ER diagram, live demo
+- [x] **Phase 6 – Showcase:** OpenAPI docs (Swagger UI), [ER diagram](docs/data-model.md), Docker image with the client bundled, one-command demo with seeded data and one-click demo logins
