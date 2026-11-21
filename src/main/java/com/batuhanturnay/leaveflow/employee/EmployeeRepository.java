@@ -31,6 +31,10 @@ public interface EmployeeRepository extends JpaRepository<Employee, Long>, JpaSp
 	@Query("select e from Employee e where e.id = :id")
 	Optional<Employee> findByIdForUpdate(Long id);
 
+	Optional<Employee> findByEmailIgnoreCase(String email);
+
+	boolean existsByRole(Role role);
+
 	boolean existsByEmailIgnoreCase(String email);
 
 	boolean existsByEmailIgnoreCaseAndIdNot(String email, Long id);

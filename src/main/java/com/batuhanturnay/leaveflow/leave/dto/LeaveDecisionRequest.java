@@ -1,16 +1,13 @@
 package com.batuhanturnay.leaveflow.leave.dto;
 
-import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 
 /**
- * Body for approving or rejecting a request. A note is optional for approval and required for rejection.
- * Until authentication arrives (Phase 3), the approver identifies themselves with {@code approverId}.
+ * Optional for approval, required (with a note) for rejection.
+ * The approver is always the logged-in user.
  */
-public record LeaveDecisionRequest(
+public record LeaveDecisionRequest(@Size(max = 500) String note) {
 
-		@NotNull Long approverId,
-
-		@Size(max = 500) String note) {
+	public static final LeaveDecisionRequest EMPTY = new LeaveDecisionRequest(null);
 
 }

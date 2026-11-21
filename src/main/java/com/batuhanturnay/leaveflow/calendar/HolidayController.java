@@ -9,6 +9,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 
 import org.springframework.http.HttpStatus;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -42,14 +43,16 @@ public class HolidayController {
 		return holidayService.findByYear(year != null ? year : LocalDate.now(clock).getYear());
 	}
 
-	@Operation(summary = "Add a public holiday")
+	@Operation(summary = "Add a public holiday (HR)")
+	@PreAuthorize("hasRole('HR')")
 	@PostMapping
 	@ResponseStatus(HttpStatus.CREATED)
 	public HolidayResponse create(@Valid @RequestBody HolidayRequest request) {
 		return holidayService.create(request);
 	}
 
-	@Operation(summary = "Remove a public holiday")
+	@Operation(summary = "Remove a public holiday (HR)")
+	@PreAuthorize("hasRole('HR')")
 	@DeleteMapping("/{id}")
 	@ResponseStatus(HttpStatus.NO_CONTENT)
 	public void delete(@PathVariable Long id) {

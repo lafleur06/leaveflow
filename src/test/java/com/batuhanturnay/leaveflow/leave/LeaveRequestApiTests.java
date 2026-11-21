@@ -14,10 +14,12 @@ import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.ResultActions;
 
 import com.batuhanturnay.leaveflow.IntegrationTest;
+import com.batuhanturnay.leaveflow.employee.Role;
 
 /**
  * "Today" is Monday 15 June 2026 (see {@link IntegrationTest#TODAY}).
- * Ayse was hired on 2023-09-01, so she has completed 2 service years and earned 2 x 14 = 28 days.
+ * Ayse reports to Mehmet. She was hired on 2023-09-01, so she has completed 2 service years
+ * and earned 2 x 14 = 28 days.
  */
 class LeaveRequestApiTests extends IntegrationTest {
 
@@ -36,7 +38,7 @@ class LeaveRequestApiTests extends IntegrationTest {
 
 	@Test
 	void calculatesBalanceFromServiceYears() throws Exception {
-		mockMvc.perform(get("/api/employees/{id}/leave-balance", ayse))
+		mockMvc.perform(get("/api/employees/{id}/leave-balance", ayse).with(as(ayse)))
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.completedServiceYears").value(2))
 			.andExpect(jsonPath("$.earnedDays").value(28))
@@ -48,14 +50,25 @@ class LeaveRequestApiTests extends IntegrationTest {
 	}
 
 	@Test
+	void balanceIsVisibleToTheEmployeeTheirManagerAndHrOnly() throws Exception {
+		long colleague = createEmployee("Zeynep", "zeynep@example.com", engineering, manager);
+
+		mockMvc.perform(get("/api/employees/{id}/leave-balance", ayse).with(as(manager))).andExpect(status().isOk());
+		mockMvc.perform(get("/api/employees/{id}/leave-balance", ayse)).andExpect(status().isOk()); // HR
+		mockMvc.perform(get("/api/employees/{id}/leave-balance", ayse).with(as(colleague)))
+			.andExpect(status().isForbidden());
+	}
+
+	@Test
 	void countsWorkingDaysWithoutWeekendsAndHolidaysAndReservesThem() throws Exception {
 		// Mon 13 - Fri 17 July 2026; Wednesday 15 July is a public holiday
 		submit(ayse, "ANNUAL", "2026-07-13", "2026-07-17").andExpect(status().isCreated())
 			.andExpect(jsonPath("$.status").value("PENDING"))
 			.andExpect(jsonPath("$.workingDays").value(4))
+			.andExpect(jsonPath("$.employee.id").value(ayse))
 			.andExpect(jsonPath("$.employee.name").value("Ayse Test"));
 
-		mockMvc.perform(get("/api/employees/{id}/leave-balance", ayse))
+		mockMvc.perform(get("/api/employees/{id}/leave-balance", ayse).with(as(ayse)))
 			.andExpect(jsonPath("$.pendingDays").value(4))
 			.andExpect(jsonPath("$.availableDays").value(24));
 	}
@@ -133,28 +146,43 @@ class LeaveRequestApiTests extends IntegrationTest {
 			.andExpect(jsonPath("$.decisionNote").value("Enjoy"))
 			.andExpect(jsonPath("$.decidedAt").isNotEmpty());
 
-		mockMvc.perform(get("/api/employees/{id}/leave-balance", ayse))
+		mockMvc.perform(get("/api/employees/{id}/leave-balance", ayse).with(as(ayse)))
 			.andExpect(jsonPath("$.usedDays").value(4))
 			.andExpect(jsonPath("$.pendingDays").value(0))
 			.andExpect(jsonPath("$.availableDays").value(24));
 	}
 
 	@Test
+	void approvalNeedsNoBody() throws Exception {
+		long id = submitAndGetId(ayse, "ANNUAL", "2026-07-13", "2026-07-17");
+
+		mockMvc.perform(post("/api/leave-requests/{id}/approve", id).with(as(manager)))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.status").value("APPROVED"));
+	}
+
+	@Test
 	void onlyTheDirectManagerMayDecide() throws Exception {
 		long colleague = createEmployee("Zeynep", "zeynep@example.com", engineering, manager);
+		long hr = createHrEmployee("Elif", "elif@example.com", engineering);
 		long id = submitAndGetId(ayse, "ANNUAL", "2026-07-13", "2026-07-17");
 
 		decide(id, "approve", colleague, null).andExpect(status().isForbidden());
+		// HR cannot overrule a manager either
+		decideAs(id, "approve", hr, Role.HR, null).andExpect(status().isForbidden());
 		decide(id, "approve", ayse, null).andExpect(status().isForbidden())
 			.andExpect(jsonPath("$.detail").value("Employees cannot decide on their own leave requests"));
 	}
 
 	@Test
-	void requestsOfEmployeesWithoutAManagerCannotBeDecidedYet() throws Exception {
+	void hrDecidesForEmployeesWithoutAManager() throws Exception {
+		long hr = createHrEmployee("Elif", "elif@example.com", engineering);
 		long id = submitAndGetId(manager, "UNPAID", "2026-07-01", "2026-07-01");
 
-		decide(id, "approve", ayse, null).andExpect(status().isUnprocessableContent())
-			.andExpect(jsonPath("$.detail").value(containsString("has no manager")));
+		decide(id, "approve", ayse, null).andExpect(status().isForbidden())
+			.andExpect(jsonPath("$.detail").value("Requests of employees without a manager are decided by HR"));
+		decideAs(id, "approve", hr, Role.HR, null).andExpect(status().isOk())
+			.andExpect(jsonPath("$.decidedBy.id").value(hr));
 	}
 
 	@Test
@@ -174,7 +202,7 @@ class LeaveRequestApiTests extends IntegrationTest {
 		decide(id, "reject", manager, "Release week, please pick other dates").andExpect(status().isOk())
 			.andExpect(jsonPath("$.status").value("REJECTED"));
 
-		mockMvc.perform(get("/api/employees/{id}/leave-balance", ayse))
+		mockMvc.perform(get("/api/employees/{id}/leave-balance", ayse).with(as(ayse)))
 			.andExpect(jsonPath("$.availableDays").value(28));
 	}
 
@@ -183,11 +211,20 @@ class LeaveRequestApiTests extends IntegrationTest {
 		long id = submitAndGetId(ayse, "ANNUAL", "2026-07-13", "2026-07-17");
 		decide(id, "approve", manager, null).andExpect(status().isOk());
 
-		mockMvc.perform(post("/api/leave-requests/{id}/cancel", id))
+		mockMvc.perform(post("/api/leave-requests/{id}/cancel", id).with(as(ayse)))
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.status").value("CANCELLED"));
-		mockMvc.perform(get("/api/employees/{id}/leave-balance", ayse))
+		mockMvc.perform(get("/api/employees/{id}/leave-balance", ayse).with(as(ayse)))
 			.andExpect(jsonPath("$.usedDays").value(0));
+	}
+
+	@Test
+	void onlyTheEmployeeOrHrMayCancel() throws Exception {
+		long id = submitAndGetId(ayse, "ANNUAL", "2026-07-13", "2026-07-17");
+
+		mockMvc.perform(post("/api/leave-requests/{id}/cancel", id).with(as(manager)))
+			.andExpect(status().isForbidden());
+		mockMvc.perform(post("/api/leave-requests/{id}/cancel", id)).andExpect(status().isOk()); // HR
 	}
 
 	@Test
@@ -195,7 +232,7 @@ class LeaveRequestApiTests extends IntegrationTest {
 		long id = submitAndGetId(ayse, "SICK", "2026-06-10", "2026-06-11");
 		decide(id, "approve", manager, null).andExpect(status().isOk());
 
-		mockMvc.perform(post("/api/leave-requests/{id}/cancel", id))
+		mockMvc.perform(post("/api/leave-requests/{id}/cancel", id).with(as(ayse)))
 			.andExpect(status().isConflict())
 			.andExpect(jsonPath("$.detail").value(containsString("already started")));
 	}
@@ -209,7 +246,8 @@ class LeaveRequestApiTests extends IntegrationTest {
 		decide(decided, "approve", manager, null).andExpect(status().isOk());
 		submitAndGetId(otherTeam, "UNPAID", "2026-07-13", "2026-07-13");
 
-		mockMvc.perform(get("/api/leave-requests").param("managerId", String.valueOf(manager))
+		mockMvc.perform(get("/api/leave-requests").with(as(manager))
+			.param("managerId", String.valueOf(manager))
 			.param("status", "PENDING"))
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.content", hasSize(1)))
@@ -217,25 +255,52 @@ class LeaveRequestApiTests extends IntegrationTest {
 			.andExpect(jsonPath("$.content[0].type").value("ANNUAL"));
 	}
 
+	@Test
+	void employeesSeeOnlyTheirOwnRequestsWhileHrSeesAll() throws Exception {
+		long colleague = createEmployee("Zeynep", "zeynep@example.com", engineering, manager);
+		long ayseRequest = submitAndGetId(ayse, "ANNUAL", "2026-07-13", "2026-07-17");
+		submitAndGetId(colleague, "UNPAID", "2026-07-20", "2026-07-20");
+
+		mockMvc.perform(get("/api/leave-requests").with(as(colleague)))
+			.andExpect(jsonPath("$.content", hasSize(1)))
+			.andExpect(jsonPath("$.content[0].employee.id").value(colleague));
+		// asking for someone else's requests explicitly does not help
+		mockMvc.perform(get("/api/leave-requests").with(as(colleague)).param("employeeId", String.valueOf(ayse)))
+			.andExpect(jsonPath("$.content", hasSize(0)));
+		mockMvc.perform(get("/api/leave-requests/{id}", ayseRequest).with(as(colleague)))
+			.andExpect(status().isForbidden());
+
+		mockMvc.perform(get("/api/leave-requests").with(as(manager))).andExpect(jsonPath("$.content", hasSize(2)));
+		mockMvc.perform(get("/api/leave-requests")).andExpect(jsonPath("$.content", hasSize(2))); // HR
+	}
+
 	private ResultActions submit(long employeeId, String type, String start, String end) throws Exception {
-		return mockMvc.perform(post("/api/leave-requests").contentType(MediaType.APPLICATION_JSON).content("""
-				{ "employeeId": %d, "type": "%s", "startDate": "%s", "endDate": "%s", "reason": "Test" }
-				""".formatted(employeeId, type, start, end)));
+		return mockMvc.perform(post("/api/leave-requests").with(as(employeeId))
+			.contentType(MediaType.APPLICATION_JSON)
+			.content("""
+					{ "type": "%s", "startDate": "%s", "endDate": "%s", "reason": "Test" }
+					""".formatted(type, start, end)));
 	}
 
 	private long submitAndGetId(long employeeId, String type, String start, String end) throws Exception {
 		return postAndReturnId("/api/leave-requests", """
-				{ "employeeId": %d, "type": "%s", "startDate": "%s", "endDate": "%s" }
-				""".formatted(employeeId, type, start, end));
+				{ "type": "%s", "startDate": "%s", "endDate": "%s" }
+				""".formatted(type, start, end), as(employeeId));
 	}
 
-	private ResultActions decide(long requestId, String action, long approverId, String note) throws Exception {
+	private ResultActions decide(long requestId, String action, long deciderId, String note) throws Exception {
+		return decideAs(requestId, action, deciderId, Role.EMPLOYEE, note);
+	}
+
+	private ResultActions decideAs(long requestId, String action, long deciderId, Role role, String note)
+			throws Exception {
 		String noteJson = note == null ? "null" : "\"" + note + "\"";
 		return mockMvc.perform(post("/api/leave-requests/{id}/{action}", requestId, action)
+			.with(as(deciderId, role))
 			.contentType(MediaType.APPLICATION_JSON)
 			.content("""
-					{ "approverId": %d, "note": %s }
-					""".formatted(approverId, noteJson)));
+					{ "note": %s }
+					""".formatted(noteJson)));
 	}
 
 }
