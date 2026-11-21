@@ -4,6 +4,7 @@ import type { FormEvent } from 'react'
 import { api } from '../api/client'
 import type { LeaveRequest } from '../api/types'
 import { useAuth } from '../auth/AuthContext'
+import { DateChip } from '../components/DateChip'
 import { ErrorMessage } from '../components/ErrorMessage'
 import { days, formatRange, leaveTypeLabel } from '../lib/format'
 
@@ -84,7 +85,8 @@ function ApprovalRow({ request }: { request: LeaveRequest }) {
   }
 
   return (
-    <li className="request-row approval-row">
+    <li className="request-row approval-row is-pending">
+      <DateChip start={request.startDate} end={request.endDate} />
       <div className="request-main">
         <p className="request-person">{request.employee.name}</p>
         <p className="request-dates">{formatRange(request.startDate, request.endDate)}</p>

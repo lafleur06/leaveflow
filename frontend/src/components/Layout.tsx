@@ -59,14 +59,22 @@ export function Layout() {
         </nav>
         {user && (
           <div className="sidebar-user">
-            <p className="sidebar-user-name">
-              {user.firstName} {user.lastName}
-            </p>
-            <p className="sidebar-user-meta">
-              {user.jobTitle ?? user.department.name}
-              {isHr && ', HR'}
-            </p>
-            <button type="button" className="button-link" onClick={logout}>
+            <div className="sidebar-user-row">
+              <span className="sidebar-avatar" aria-hidden="true">
+                {user.firstName.charAt(0)}
+                {user.lastName.charAt(0)}
+              </span>
+              <div>
+                <p className="sidebar-user-name">
+                  {user.firstName} {user.lastName}
+                </p>
+                <p className="sidebar-user-meta">
+                  {user.jobTitle ?? user.department.name}
+                  {isHr && ', HR'}
+                </p>
+              </div>
+            </div>
+            <button type="button" className="button-link sidebar-logout" onClick={logout}>
               Log out
             </button>
           </div>

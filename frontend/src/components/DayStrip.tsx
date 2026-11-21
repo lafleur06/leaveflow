@@ -40,9 +40,18 @@ export function DayStrip({ balance }: { balance: LeaveBalance }) {
         {availableDays === 1 ? ' day of annual leave left' : ' days of annual leave left'}
       </h1>
 
+      {/* in groups of five, like a tally, so 34 reads as six full groups and four */}
       <ol className="day-strip" aria-hidden="true">
-        {tiles.map((kind, index) => (
-          <li key={index} className={`day-tile ${kind}`} style={{ '--i': index } as CSSProperties} />
+        {Array.from({ length: Math.ceil(tiles.length / 5) }, (_, group) => (
+          <li key={group} className="day-group">
+            {tiles.slice(group * 5, group * 5 + 5).map((kind, offset) => (
+              <span
+                key={offset}
+                className={`day-tile ${kind}`}
+                style={{ '--i': group * 5 + offset } as CSSProperties}
+              />
+            ))}
+          </li>
         ))}
       </ol>
 

@@ -4,6 +4,7 @@ import type { FormEvent } from 'react'
 import { ApiError, api } from '../api/client'
 import type { LeaveRequest, LeaveType } from '../api/types'
 import { useAuth } from '../auth/AuthContext'
+import { DateChip } from '../components/DateChip'
 import { DayStrip } from '../components/DayStrip'
 import { ErrorMessage } from '../components/ErrorMessage'
 import { LeaveHistory } from '../components/LeaveHistory'
@@ -157,6 +158,7 @@ function MyRequestRow({ request }: { request: LeaveRequest }) {
 
   return (
     <li className={`request-row is-${request.status.toLowerCase()}`}>
+      <DateChip start={request.startDate} end={request.endDate} />
       <div className="request-main">
         <p className="request-dates">{formatRange(request.startDate, request.endDate)}</p>
         <p className="request-meta">
@@ -168,32 +170,34 @@ function MyRequestRow({ request }: { request: LeaveRequest }) {
           </p>
         )}
         <ErrorMessage error={cancel.error} />
-        <button
-          type="button"
-          className="button-link history-toggle"
-          aria-expanded={showHistory}
-          onClick={() => setShowHistory(!showHistory)}
-        >
-          {showHistory ? 'Hide history' : 'History'}
-        </button>
+        <div className="request-actions">
+          <button
+            type="button"
+            className="button-link history-toggle"
+            aria-expanded={showHistory}
+            onClick={() => setShowHistory(!showHistory)}
+          >
+            {showHistory ? 'Hide history' : 'History'}
+          </button>
+          {cancellable && (
+            <button
+              type="button"
+              className="button-link request-cancel"
+              disabled={cancel.isPending}
+              onClick={() => {
+                if (window.confirm(`Cancel your leave for ${formatRange(request.startDate, request.endDate)}?`)) {
+                  cancel.mutate()
+                }
+              }}
+            >
+              Cancel request
+            </button>
+          )}
+        </div>
         {showHistory && <LeaveHistory requestId={request.id} />}
       </div>
       <div className="request-side">
         <StatusBadge status={request.status} />
-        {cancellable && (
-          <button
-            type="button"
-            className="button-link"
-            disabled={cancel.isPending}
-            onClick={() => {
-              if (window.confirm(`Cancel your leave for ${formatRange(request.startDate, request.endDate)}?`)) {
-                cancel.mutate()
-              }
-            }}
-          >
-            Cancel request
-          </button>
-        )}
       </div>
     </li>
   )
