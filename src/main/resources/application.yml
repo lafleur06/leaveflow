@@ -27,6 +27,13 @@ server:
   error:
     include-message: always
 
+springdoc:
+  swagger-ui:
+    tags-sorter: alpha
+    # Opens every operation ready to send, without clicking "Try it out" first.
+    try-it-out-enabled: true
+    display-request-duration: true
+
 management:
   endpoints:
     web:
