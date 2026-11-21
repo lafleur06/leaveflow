@@ -4,6 +4,7 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
+import java.util.List;
 
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -22,6 +23,7 @@ import com.batuhanturnay.leaveflow.employee.EmployeeService;
 import com.batuhanturnay.leaveflow.leave.dto.LeaveBalanceResponse;
 import com.batuhanturnay.leaveflow.leave.dto.LeaveDecisionRequest;
 import com.batuhanturnay.leaveflow.leave.dto.LeaveRequestCreateRequest;
+import com.batuhanturnay.leaveflow.leave.dto.LeaveRequestEventResponse;
 import com.batuhanturnay.leaveflow.leave.dto.LeaveRequestResponse;
 import com.batuhanturnay.leaveflow.security.AuthenticatedUser;
 import com.batuhanturnay.leaveflow.security.CurrentUser;
@@ -31,6 +33,8 @@ import com.batuhanturnay.leaveflow.security.CurrentUser;
 public class LeaveRequestService {
 
 	private final LeaveRequestRepository leaveRequestRepository;
+
+	private final LeaveRequestEventRepository eventRepository;
 
 	private final EmployeeRepository employeeRepository;
 
@@ -44,10 +48,12 @@ public class LeaveRequestService {
 
 	private final Clock clock;
 
-	public LeaveRequestService(LeaveRequestRepository leaveRequestRepository, EmployeeRepository employeeRepository,
+	LeaveRequestService(LeaveRequestRepository leaveRequestRepository, LeaveRequestEventRepository eventRepository,
+			EmployeeRepository employeeRepository,
 			EmployeeService employeeService, HolidayService holidayService, LeaveBalanceService balanceService,
 			CurrentUser currentUser, Clock clock) {
 		this.leaveRequestRepository = leaveRequestRepository;
+		this.eventRepository = eventRepository;
 		this.employeeRepository = employeeRepository;
 		this.employeeService = employeeService;
 		this.holidayService = holidayService;
@@ -120,7 +126,7 @@ public class LeaveRequestService {
 		}
 
 		LeaveRequest saved = leaveRequestRepository
-			.save(new LeaveRequest(employee, type, start, end, workingDays, request.reason()));
+			.save(new LeaveRequest(employee, type, start, end, workingDays, request.reason(), now()));
 		return LeaveRequestResponse.from(saved);
 	}
 
@@ -151,8 +157,20 @@ public class LeaveRequestService {
 		if (!user.isHr() && !user.is(request.getEmployee().getId())) {
 			throw new ForbiddenException("Only the employee or HR can cancel leave request %d".formatted(id));
 		}
-		request.cancel(LocalDate.now(clock));
+		request.cancel(employeeService.getEntity(user.id()), LocalDate.now(clock), now());
 		return LeaveRequestResponse.from(leaveRequestRepository.saveAndFlush(request));
+	}
+
+	/** The request's history, oldest first. Visible to whoever may see the request. */
+	public List<LeaveRequestEventResponse> history(Long id) {
+		LeaveRequest request = getEntity(id);
+		if (!LeaveAccess.canView(currentUser.get(), request.getEmployee())) {
+			throw new ForbiddenException("You may not view leave request %d".formatted(id));
+		}
+		return eventRepository.findByLeaveRequestIdOrderByOccurredAtAscIdAsc(id)
+			.stream()
+			.map(LeaveRequestEventResponse::from)
+			.toList();
 	}
 
 	private LeaveRequest getEntity(Long id) {

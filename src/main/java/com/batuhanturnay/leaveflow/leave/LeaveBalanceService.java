@@ -47,12 +47,20 @@ public class LeaveBalanceService {
 	}
 
 	LeaveBalanceResponse calculate(Employee employee) {
-		AnnualLeavePolicy.Accrual accrual = AnnualLeavePolicy.accrualAsOf(employee.getBirthDate(),
-				employee.getHireDate(), LocalDate.now(clock));
 		int used = leaveRequestRepository.sumWorkingDays(employee.getId(), LeaveType.ANNUAL, LeaveStatus.APPROVED);
 		int pending = leaveRequestRepository.sumWorkingDays(employee.getId(), LeaveType.ANNUAL, LeaveStatus.PENDING);
+		return balanceOf(employee, used, pending, LocalDate.now(clock));
+	}
+
+	/**
+	 * The balance from days already summed up, so reports can load the sums for many employees
+	 * in one query and still use exactly the same rule as the single-employee endpoint.
+	 */
+	public static LeaveBalanceResponse balanceOf(Employee employee, int usedDays, int pendingDays, LocalDate today) {
+		AnnualLeavePolicy.Accrual accrual = AnnualLeavePolicy.accrualAsOf(employee.getBirthDate(),
+				employee.getHireDate(), today);
 		return new LeaveBalanceResponse(employee.getId(), accrual.completedServiceYears(), accrual.earnedDays(),
-				used, pending, accrual.earnedDays() - used - pending, accrual.nextAccrualDate(),
+				usedDays, pendingDays, accrual.earnedDays() - usedDays - pendingDays, accrual.nextAccrualDate(),
 				accrual.nextAccrualDays());
 	}
 
